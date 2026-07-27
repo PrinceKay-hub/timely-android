@@ -1,16 +1,20 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:booking/presentaion/auth/cubit/auth_cubit.dart';
 import 'package:booking/presentaion/provider/pages/registration_screen.dart';
 import 'package:booking/presentaion/screens/favorite/favorite_screen.dart';
 import 'package:booking/presentaion/screens/profile/about.dart';
+import 'package:booking/presentaion/screens/profile/edit_profile.dart';
 import 'package:booking/presentaion/screens/profile/policy.dart';
 import 'package:booking/presentaion/screens/profile/terms.dart';
+import 'package:booking/presentaion/screens/profile/try_on_history.dart';
 import 'package:booking/presentaion/theme/cubit/theme_cubit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -87,6 +91,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
       throw 'Could not launch WhatsApp. Make sure it is installed.';
     }
   }
+
+  void _openStoreReview() {
+  const appId = '6760649428';
+  const packageName = 'com.timely.booking';
+
+  final url = Platform.isIOS
+      ? 'https://apps.apple.com/app/id$appId?action=write-review'
+      : 'https://play.google.com/store/apps/details?id=$packageName&reviewId=...';
+
+  launchUrl(Uri.parse(url)).catchError((e) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open store page.')),
+    );
+  });
+}
 
   @override
   void dispose() {
@@ -234,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
-                  _buildMenuSection(context, 'Account Settings', [
+                  _buildMenuSection(context, 'Account', [
                     _buildMenuItem(
                       context,
                       Icons.category_outlined,
@@ -266,6 +285,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     _buildMenuItem(
                       context,
+                      Icons.edit,
+                      'Edit Profile',
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                EditProfileScreen(user: widget.user),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildMenuItem(
+                      context,
                       Icons.favorite_outline,
                       'My Favorites',
                       () {
@@ -274,6 +307,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           MaterialPageRoute(
                             builder: (context) =>
                                 FavoriteScreen(user: widget.user),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildMenuItem(
+                      context,
+                      FontAwesomeIcons.wandMagicSparkles,
+                      'Try-On-History',
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                TryOnViewerScreen(),
                           ),
                         );
                       },
@@ -334,6 +381,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         }
                       },
                     ),
+                    _buildMenuItem(
+                        context,
+                        Icons.star_border,
+                        'Rate App',
+                        () => _openStoreReview(),
+                      ),
                     _buildMenuItem(
                       context, Icons.info_outline, 'About', () {
                       Navigator.push(

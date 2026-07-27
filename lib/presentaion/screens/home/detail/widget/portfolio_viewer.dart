@@ -1,13 +1,13 @@
 import 'package:booking/data/models/portfolio_model.dart';
 import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_bloc.dart';
 import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_state.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 class PortfolioViewerScreen extends StatefulWidget {
-   final String serviceId;
+  final String serviceId;
   final int initialIndex;
 
   const PortfolioViewerScreen({
@@ -31,31 +31,13 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: widget.initialIndex);
-    
-    // Hide system UI for immersive experience
-   // SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
   void dispose() {
     _pageController.dispose();
-    // Restore system UI
-    //SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
-
-  /*void _toggleLike(int index) {
-
-    
-   /* setState(() {
-      widget.portfolioItems[index].isLiked = !widget.portfolioItems[index].isLiked;
-      if (widget.portfolioItems[index].isLiked) {
-        widget.portfolioItems[index].likes++;
-      } else {
-        widget.portfolioItems[index].likes--;
-      }
-    });*/
-  }*/
 
   @override
   Widget build(BuildContext context) {
@@ -77,8 +59,9 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () =>
-                        context.read<PortfolioCubit>().loadPortfolio(widget.serviceId),
+                    onPressed: () => context
+                        .read<PortfolioCubit>()
+                        .loadPortfolio(widget.serviceId),
                     child: const Text('Retry'),
                   ),
                 ],
@@ -88,7 +71,6 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
           if (state is PortfolioLoaded) {
             final portfolioItems = state.images;
             if (portfolioItems.isEmpty) {
-              
               return const Center(
                 child: Text(
                   'No portfolio images',
@@ -100,7 +82,9 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
             // Adjust current index if list shrunk (e.g., after deletion)
             if (_currentIndex >= portfolioItems.length) {
               _currentIndex = portfolioItems.length - 1;
-              _pageController.jumpToPage(_currentIndex);
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _pageController.jumpToPage(_currentIndex);
+              });
             }
 
             return Stack(
@@ -113,7 +97,7 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
                     setState(() => _currentIndex = index);
                   },
                   itemBuilder: (context, index) {
-                    return _buildPortfolioPage(portfolioItems[index]);
+                    return _buildPortfolioPage(context, portfolioItems[index]);
                   },
                 ),
                 // Close button
@@ -127,7 +111,8 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
                         color: Colors.black.withOpacity(0.5),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, color: Colors.white, size: 24),
+                      child: const Icon(Icons.close,
+                          color: Colors.white, size: 24),
                     ),
                   ),
                 ),
@@ -140,9 +125,16 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
     );
   }
 
-  Widget _buildPortfolioPage(PortfolioImage item) {
+  Widget _buildPortfolioPage(BuildContext context, PortfolioImage item) {
     final userId = _auth.currentUser!.uid;
     final isLiked = item.likes!.contains(userId);
+
+    // Full-screen zoomable viewer (up to 4x) — cap the decode at ~2x
+    // screen size so we're not decoding a full multi-thousand-pixel
+    // camera photo, but still stay sharp when zoomed.
+    final mq = MediaQuery.of(context);
+    final cacheWidth = (mq.size.width * mq.devicePixelRatio * 2).round();
+
     return GestureDetector(
       onTap: () => setState(() => _showUI = !_showUI),
       child: Stack(
@@ -154,21 +146,23 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
               minScale: 1.0,
               maxScale: 4.0,
               child: Center(
-                child: Image.network(
-                  item.imageUrl,
+                child: CachedNetworkImage(
+                  imageUrl: item.imageUrl,
                   fit: BoxFit.contain,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
+                  memCacheWidth: cacheWidth,
+                  fadeInDuration: const Duration(milliseconds: 150),
+                  progressIndicatorBuilder: (context, url, progress) {
                     return Center(
                       child: CircularProgressIndicator(
-                        value: loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
+                        value: progress.progress,
                         color: const Color(0xFF8B5CF6),
                       ),
                     );
                   },
+                  errorWidget: (context, url, error) => const Center(
+                    child: Icon(Icons.broken_image,
+                        color: Colors.white, size: 48),
+                  ),
                 ),
               ),
             ),
@@ -202,7 +196,6 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
               bottom: 120,
               child: Column(
                 children: [
-                  // Like Button
                   _buildActionButton(
                     icon: Icons.favorite,
                     label: _formatCount(item.likes?.length ?? 0),
@@ -213,40 +206,7 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
                           .toggleLike(widget.serviceId, item.id);
                     },
                   ),
-                  SizedBox(height: 24),
-
-                  // Share Button
-                 /*   _buildActionButton(
-                    icon: Icons.share,
-                    label: 'Share',
-                    color: Colors.white,
-                    onTap: () {
-                      // Implement share functionality
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Share functionality coming soon!'),
-                          backgroundColor: Color(0xFF8B5CF6),
-                        ),
-                      );
-                    },
-                  ),
-                  SizedBox(height: 24),
-
-                  // Download Button
-                _buildActionButton(
-                    icon: Icons.download,
-                    label: 'Save',
-                    color: Colors.white,
-                    onTap: () {
-                      // Implement download functionality
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Image saved to gallery!'),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
-                    },
-                  ),*/
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -259,13 +219,12 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
               right: 80,
               child: SafeArea(
                 child: Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-
-                       Text(
+                      Text(
                         item.serviceName,
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.7),
@@ -276,11 +235,11 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
                       // Caption
                       if (item.caption.isNotEmpty)
                         Container(
-                          constraints: BoxConstraints(maxHeight: 100),
+                          constraints: const BoxConstraints(maxHeight: 100),
                           child: SingleChildScrollView(
                             child: Text(
                               item.caption,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 14,
                                 height: 1.4,
@@ -288,43 +247,11 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
                             ),
                           ),
                         ),
-                      SizedBox(height: 8),
-
-                      // Tags
-                     /* if (item.tags != null && item.tags!.isNotEmpty)
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: item.tags!.map((tag) {
-                            return Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Color(0xFF8B5CF6).withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Color(0xFF8B5CF6).withOpacity(0.5),
-                                ),
-                              ),
-                              child: Text(
-                                '#$tag',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      SizedBox(height: 8),*/
+                      const SizedBox(height: 8),
 
                       // Date
                       Text(
                         formatDateDifference(item.createdAt),
-                        //item.createdAt.toString(),
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.5),
                           fontSize: 12,
@@ -350,7 +277,7 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
       onTap: onTap,
       child: Column(
         children: [
-          Container(
+          SizedBox(
             width: 40,
             height: 40,
             child: Icon(
@@ -359,16 +286,16 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
               size: 28,
             ),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 12,
               fontWeight: FontWeight.w600,
               shadows: [
                 Shadow(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black38,
                   blurRadius: 4,
                 ),
               ],
@@ -390,42 +317,39 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
   }
 
   String formatDateDifference(DateTime createdDate) {
-  // Convert UTC timestamp to local timezone
-  final DateTime createdLocal = createdDate.toLocal();
-  final DateTime nowLocal = DateTime.now();
+    final DateTime createdLocal = createdDate.toLocal();
+    final DateTime nowLocal = DateTime.now();
 
-  // Extract only the date parts (ignore time)
-  final DateTime createdOnly = DateTime(createdLocal.year, createdLocal.month, createdLocal.day);
-  final DateTime nowOnly = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
+    final DateTime createdOnly =
+        DateTime(createdLocal.year, createdLocal.month, createdLocal.day);
+    final DateTime nowOnly =
+        DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
 
-  // Calendar day difference
-  final int dayDiff = nowOnly.difference(createdOnly).inDays;
+    final int dayDiff = nowOnly.difference(createdOnly).inDays;
+    final Duration diff = nowLocal.difference(createdLocal);
 
-  // For relative time strings (minutes, hours) we still use the full difference
-  final Duration diff = nowLocal.difference(createdLocal);
-
-  if (diff.isNegative) {
-    return "In the future";
-  } else if (diff.inMinutes < 1) {
-    return "Just now";
-  } else if (diff.inHours < 1) {
-    return "${diff.inMinutes} minutes ago";
-  } else if (dayDiff == 0) {
-    return "Today";
-  } else if (dayDiff == 1) {
-    return "Yesterday";
-  } else if (dayDiff < 30) {
-    return "$dayDiff days ago";
-  } else if (dayDiff < 60) {
-    return "1 month ago";
-  } else if (dayDiff < 365) {
-    final int months = (dayDiff / 30).floor();
-    return "$months months ago";
-  } else if (dayDiff < 730) {
-    return "1 year ago";
-  } else {
-    final int years = (dayDiff / 365).floor();
-    return "$years years ago";
+    if (diff.isNegative) {
+      return "In the future";
+    } else if (diff.inMinutes < 1) {
+      return "Just now";
+    } else if (diff.inHours < 1) {
+      return "${diff.inMinutes} minutes ago";
+    } else if (dayDiff == 0) {
+      return "Today";
+    } else if (dayDiff == 1) {
+      return "Yesterday";
+    } else if (dayDiff < 30) {
+      return "$dayDiff days ago";
+    } else if (dayDiff < 60) {
+      return "1 month ago";
+    } else if (dayDiff < 365) {
+      final int months = (dayDiff / 30).floor();
+      return "$months months ago";
+    } else if (dayDiff < 730) {
+      return "1 year ago";
+    } else {
+      final int years = (dayDiff / 365).floor();
+      return "$years years ago";
+    }
   }
-}
 }

@@ -14,6 +14,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:upgrader/upgrader.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic> user;
@@ -46,6 +47,20 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _saveFCMToken() async {
+    final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
+    Map<String, dynamic> deviceData = {};
+
+    AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
+        deviceData = {
+          'model': androidInfo.model,
+          'manufacturer': androidInfo.manufacturer,
+          'brand': androidInfo.brand,
+          'androidVersion': androidInfo.version.release,
+          'sdkInt': androidInfo.version.sdkInt,
+          'isPhysicalDevice': androidInfo.isPhysicalDevice,
+          'deviceType': 'Android',
+        };
+    
     final authState = context.read<AuthCubit>().state;
     if (authState is AuthAuthenticated) {
       final token = await FirebaseMessaging.instance.getToken();
@@ -53,9 +68,18 @@ class _HomeScreenState extends State<HomeScreen>
         await FirebaseFirestore.instance
             .collection('users')
             .doc(widget.user['id'])
-            .set({'fcmToken': token}, SetOptions(merge: true));
+            .set(
+              {
+                'fcmToken': token,
+                'deviceInfo': deviceData,
+              }, SetOptions(merge: true));
       }
     }
+  }
+
+  Future<void> onRefresh() async {
+    context.read<ServiceDataCubit>().fetchServiceData();
+    Future.delayed(Duration(milliseconds: 2));
   }
 
   @override
@@ -79,24 +103,27 @@ class _HomeScreenState extends State<HomeScreen>
         }
       },
       child: UpgradeAlert(
-        child: Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.secondary,
-          body: CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              // App bar
-              ModernAppBar(user: widget.user),
-              SliverPadding(
-                padding: EdgeInsets.zero,
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate.fixed([
-                    SpecialOffersCard(user: widget.user),
-                    CategoriesSection(user: widget.user),
-                    RecommendedSection(user: widget.user),
-                  ]),
+        child: RefreshIndicator(
+          onRefresh: onRefresh,
+          child: Scaffold(
+            backgroundColor: Theme.of(context).colorScheme.secondary,
+            body: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // App bar
+                ModernAppBar(user: widget.user),
+                SliverPadding(
+                  padding: EdgeInsets.zero,
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate.fixed([
+                      SpecialOffersCard(user: widget.user),
+                      CategoriesSection(user: widget.user),
+                      RecommendedSection(user: widget.user),
+                    ]),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

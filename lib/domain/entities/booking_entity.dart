@@ -3,7 +3,7 @@ import 'package:equatable/equatable.dart';
 
 class ServiceOption extends Equatable {
   final String title;
-  final int price;
+  final String price;
   final int durationMinutes;
 
   const ServiceOption({
@@ -38,7 +38,7 @@ class BookingEntity extends Equatable {
   final DateTime appointmentDate;
   final TimeSlot timeSlot;
   final ServiceOption serviceOption;
-  final int totalAmount;
+  final String totalAmount;
   final String status; // pending, confirmed, cancelled, completed
   final DateTime createdAt;
   final String userName;
@@ -49,6 +49,7 @@ class BookingEntity extends Equatable {
   final Map<String, dynamic> workingHours;
   final List<Map<String, dynamic>> services;
   final bool reminderSent;
+  final String phone;
 
   const BookingEntity({
     required this.id,
@@ -70,6 +71,7 @@ class BookingEntity extends Equatable {
     required this.workingHours,
     required this.services, 
     this.reminderSent = false,
+    required this.phone
   });
 
   @override
@@ -92,6 +94,7 @@ class BookingEntity extends Equatable {
     workingDays,
     workingHours,
     services,
-    reminderSent
+    reminderSent,
+    phone
   ];
 }

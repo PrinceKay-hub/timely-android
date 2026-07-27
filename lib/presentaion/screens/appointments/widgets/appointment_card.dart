@@ -15,6 +15,7 @@ class AppointmentCard extends StatelessWidget {
   final VoidCallback? onCancel;
   final VoidCallback? onConfirm;
   final VoidCallback? onReschedule;
+  final VoidCallback? onClientCall;
   final VoidCallback? onDirections;
   final VoidCallback? onRebook;
   final VoidCallback? onDelete;
@@ -37,6 +38,7 @@ class AppointmentCard extends StatelessWidget {
     this.onCancel,
     this.onConfirm,
     this.onReschedule,
+    this.onClientCall,
     this.onDirections,
     this.onRebook,
     this.onDelete,
@@ -141,7 +143,7 @@ class AppointmentCard extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   Text(
-                                    'Booking ID: $bookingId',
+                                    'ID: $bookingId',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: Colors.grey,
@@ -149,7 +151,7 @@ class AppointmentCard extends StatelessWidget {
                                     ),
                                   ),
                                   Text(
-                                    'Created at: $formattedCreatedAt',
+                                    'Created: $formattedCreatedAt',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: Colors.grey,
@@ -382,6 +384,20 @@ class AppointmentCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (isProvider)
+              Expanded(
+                child: TextButton(
+                  onPressed: onClientCall,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text(
+                    'Call Client',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
           ],
         );
 
@@ -420,6 +436,19 @@ class AppointmentCard extends StatelessWidget {
                   ),
                 ),
               ),
+              if (isProvider)
+              Expanded(
+                child: TextButton(
+                  onPressed: onClientCall,
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.green,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text(
+                    'Call Client',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),),
           ],
         );
 

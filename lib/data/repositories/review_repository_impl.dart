@@ -2,6 +2,7 @@ import 'package:booking/data/models/review_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ReviewRepositoryImpl {
+
   Future<void> submitReview({
     required String providerId,
     required String userId,
@@ -18,36 +19,12 @@ class ReviewRepositoryImpl {
       rating: rating,
       comment: comment,
       createdAt: DateTime.now(),
+      serviceId: serviceId,
     );
 
     // Add to Firestore
     await FirebaseFirestore.instance.collection('reviews').add(review.toMap());
 
-    // Optionally update provider's average rating (see below)
-    await _updateProviderRating(providerId, serviceId);
-  }
-
-  Future<void> _updateProviderRating(String providerId, String serviceId) async {
-    final reviewsSnapshot = await FirebaseFirestore.instance
-        .collection('reviews')
-        .where('providerId', isEqualTo: providerId)
-        .get();
-
-    if (reviewsSnapshot.docs.isEmpty) return;
-
-    double total = 0;
-    for (var doc in reviewsSnapshot.docs) {
-      total += doc['rating'];
-    }
-    double average = total / reviewsSnapshot.docs.length;
-
-    await FirebaseFirestore.instance
-        .collection('services') // adjust your providers collection name
-        .doc(serviceId)
-        .update({
-          'rating': average,
-          'totalReviews': reviewsSnapshot.docs.length,
-        });
   }
 
 

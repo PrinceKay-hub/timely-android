@@ -5,6 +5,7 @@ abstract class UserRepository {
   Future<Map<String, dynamic>> getUser();
   
   Future<void> updateUser(String displayName, );
+  Future<void> updateUserContact(String phone, );
 
   Future<void> updateUserType(String type);
   

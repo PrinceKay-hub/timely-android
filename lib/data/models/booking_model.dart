@@ -22,6 +22,7 @@ class BookingModel extends BookingEntity {
     required super.workingHours,
     required super.services,
     super.reminderSent = false,
+    required super.phone
   });
 
   factory BookingModel.fromJson(Map<String, dynamic> json) {
@@ -38,10 +39,10 @@ class BookingModel extends BookingEntity {
       ),
       serviceOption: ServiceOption(
         title: json['serviceOption']['title'] ?? '',
-        price: (json['serviceOption']['price'] ?? 0.0).toDouble(),
+        price: json['serviceOption']['price'] ?? '',
         durationMinutes: json['serviceOption']['durationMinutes'] ?? 60,
       ),
-      totalAmount: (json['totalAmount'] ?? 0),
+      totalAmount: json['totalAmount'] ?? '',
       status: json['status'] ?? 'pending',
       createdAt: (json['createdAt'] as Timestamp).toDate(),
       userName: json['userName'] ?? '',
@@ -51,7 +52,8 @@ class BookingModel extends BookingEntity {
       workingDays: json['workingDays'] ?? [],
       workingHours: json['workingHours'] ?? {},
       services: List.from(json['services'] ?? []),
-      reminderSent: json['reminderSent'] ?? false
+      reminderSent: json['reminderSent'] ?? false,
+      phone: json['phone'] ?? '',
     );
   }
 
@@ -75,7 +77,8 @@ class BookingModel extends BookingEntity {
       workingDays: entity.workingDays,
       workingHours: entity.workingHours,
       services: entity.services,
-      reminderSent: entity.reminderSent
+      reminderSent: entity.reminderSent,
+      phone: entity.phone
     );
   }
 
@@ -106,7 +109,8 @@ class BookingModel extends BookingEntity {
       'workingDays': workingDays,
       'workingHours': workingHours,
       'services': services,
-      'reminderSent': reminderSent
+      'reminderSent': reminderSent,
+      'phone': phone
     };
   }
 
@@ -130,7 +134,8 @@ class BookingModel extends BookingEntity {
       workingDays: workingDays,
       workingHours: workingHours,
       services: services,
-      reminderSent: reminderSent
+      reminderSent: reminderSent,
+      phone: phone
     );
   }
 }

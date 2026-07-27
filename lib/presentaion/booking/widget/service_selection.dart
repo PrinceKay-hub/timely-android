@@ -9,18 +9,38 @@ class ServiceSelection extends StatelessWidget {
   Widget build(BuildContext context) {
     final cubit = context.read<BookingFormCubit>();
     final services = cubit.services;
-    final selectedIndex = context.select((BookingFormCubit c) => c.state.selectedServiceIndex);
+    final selectedIndices = context.select(
+      (BookingFormCubit c) => c.state.selectedServiceIndices,
+    );
+
+    String formatDuration(int minutes) {
+      if (minutes >= 60 && minutes % 60 == 0) {
+        return '${minutes ~/ 60} hr';
+      } else if (minutes > 60) {
+        return '${minutes ~/ 60}h ${minutes % 60}m';
+      }
+      return '$minutes mins';
+    }
+
+    String displayPrice(dynamic price) {
+      if (price is num) return '₵$price';
+      final parts = price.toString().split(' - ');
+      if (parts.length == 2) {
+        return '₵${parts[0].trim()} - ₵${parts[1].trim()}';
+      }
+      return '₵$price';
+    }
 
     return ListView.builder(
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
       itemCount: services.length,
       itemBuilder: (context, index) {
-        final isSelected = selectedIndex == index;
+        final isSelected = selectedIndices.contains(index);
         final service = services[index];
 
         return GestureDetector(
-          onTap: () => cubit.selectService(index),
+          onTap: () => cubit.toggleService(index),
           child: Container(
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(16),
@@ -28,7 +48,9 @@ class ServiceSelection extends StatelessWidget {
               color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: isSelected ? const Color(0xFF8B5CF6) : Colors.transparent,
+                color: isSelected
+                    ? const Color(0xFF8B5CF6)
+                    : Colors.transparent,
                 width: 2,
               ),
             ),
@@ -38,9 +60,11 @@ class ServiceSelection extends StatelessWidget {
                   width: 24,
                   height: 24,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(4),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF8B5CF6) : Colors.grey.withOpacity(0.3),
+                      color: isSelected
+                          ? const Color(0xFF8B5CF6)
+                          : Colors.grey.withOpacity(0.3),
                       width: 2,
                     ),
                     color: isSelected ? const Color(0xFF8B5CF6) : Colors.white,
@@ -56,18 +80,24 @@ class ServiceSelection extends StatelessWidget {
                     children: [
                       Text(
                         service['name'] ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${service['duration']?.toString() ?? '0'} mins',
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        formatDuration(service['duration']),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 Text(
-                  '₵${service['price']?.toString() ?? '0'}',
+                  displayPrice(service['price']),
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,

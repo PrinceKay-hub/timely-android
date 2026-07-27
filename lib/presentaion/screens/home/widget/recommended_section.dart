@@ -16,6 +16,79 @@ class RecommendedSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocBuilder<ServiceDataCubit, ServiceDataState>(
       builder: (context, state) {
+        if (state is ServiceDataLoading) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.secondary,
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
+                    ),
+                    child: Shimmer.fromColors(
+                      baseColor: Theme.of(context).colorScheme.surface,
+                      highlightColor: Theme.of(context).scaffoldBackgroundColor,
+                      child: Container(
+                        height: 160,
+                        width: double.infinity,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          height: 25,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(5),
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                          ),
+                        ),
+
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 50,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(5),
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: 200,
+                          height: 15,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(5),
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
         if (state is ServiceDataLoaded) {
           final services = state.serviceData;
           if (services.isEmpty) {
@@ -25,15 +98,16 @@ class RecommendedSection extends StatelessWidget {
             children: [
               const _ViewTypeSwitcher(),
               const SizedBox(height: 10),
-              _ServicesView(services: services, user: user,),
+              _ServicesView(services: services, user: user),
             ],
           );
-        } 
+        }
         if (state is ServiceDataError) {
           return NetworkError(
             onTap: () {
-            context.read<ServiceDataCubit>().fetchServiceData();
-          },);
+              context.read<ServiceDataCubit>().fetchServiceData();
+            },
+          );
         }
         return const SizedBox.shrink();
       },
@@ -60,12 +134,12 @@ class RecommendedSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-             Text(
+            Text(
               'No Content Available',
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurface
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 12),
@@ -88,7 +162,10 @@ class RecommendedSection extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.primary,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -127,7 +204,8 @@ class _ViewTypeSwitcher extends StatelessWidget {
               Row(
                 children: [
                   IconButton(
-                    onPressed: () => context.read<HomeCubit>().setViewType(ViewType.tile),
+                    onPressed: () =>
+                        context.read<HomeCubit>().setViewType(ViewType.tile),
                     icon: Icon(
                       Icons.window,
                       size: 18,
@@ -137,20 +215,22 @@ class _ViewTypeSwitcher extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => context.read<HomeCubit>().setViewType(ViewType.grid),
+                    onPressed: () =>
+                        context.read<HomeCubit>().setViewType(ViewType.grid),
                     icon: Icon(
                       Icons.grid_on,
-                       size: 18,
+                      size: 18,
                       color: state.viewType == ViewType.grid
                           ? Theme.of(context).colorScheme.primary
                           : Colors.grey,
                     ),
                   ),
                   IconButton(
-                    onPressed: () => context.read<HomeCubit>().setViewType(ViewType.list),
+                    onPressed: () =>
+                        context.read<HomeCubit>().setViewType(ViewType.list),
                     icon: Icon(
                       Icons.view_list,
-                       size: 18,
+                      size: 18,
                       color: state.viewType == ViewType.list
                           ? Theme.of(context).colorScheme.primary
                           : Colors.grey,
@@ -178,9 +258,9 @@ class _ServicesView extends StatelessWidget {
       builder: (context, state) {
         switch (state.viewType) {
           case ViewType.tile:
-            return _TileView(services: services, user: user,);
+            return _TileView(services: services, user: user);
           case ViewType.grid:
-            return _GridView(services: services, user: user,);
+            return _GridView(services: services, user: user);
           case ViewType.list:
             return _ListView(services: services, user: user);
         }
@@ -208,7 +288,13 @@ class _TileView extends StatelessWidget {
     );
   }
 
-  Widget _buildTileItem(BuildContext context, Map<String, dynamic> item,  Map<String, dynamic> user) {
+  Widget _buildTileItem(
+    BuildContext context,
+    Map<String, dynamic> item,
+    Map<String, dynamic> user,
+  ) {
+    var land = item['landmark'];
+    var landmark = land != null ? ', $land' : '';
     return GestureDetector(
       onTap: () => _navigateToDetail(context, item, user),
       child: Container(
@@ -232,14 +318,30 @@ class _TileView extends StatelessWidget {
                 topRight: Radius.circular(15),
               ),
               child: CachedNetworkImage(
-                imageUrl: item['images']?[0] ?? '',
+                imageUrl:
+                    (item['images'] is List &&
+                        (item['images'] as List).isNotEmpty)
+                    ? item['images'][0] as String
+                    : '',
                 height: 160,
                 width: double.infinity,
                 fit: BoxFit.cover,
+                memCacheWidth: 400,
+                fadeInDuration: const Duration(milliseconds: 200),
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: Theme.of(context).colorScheme.surfaceBright,
+                  highlightColor: Theme.of(context).colorScheme.surfaceDim,
+                  child: Container(
+                    height: 160,
+                    width: double.infinity,
+                    color: Colors.white,
+                  ),
+                ),
                 errorWidget: (_, __, ___) => Container(
                   height: 160,
-                  color: Colors.grey[200],
-                  child: Icon(Icons.image_not_supported, color: Colors.grey[400]),
+                  width: double.infinity,
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.error),
                 ),
               ),
             ),
@@ -253,7 +355,10 @@ class _TileView extends StatelessWidget {
                       Expanded(
                         child: Text(
                           item['name'] ?? '',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                       if (item['isVerified'] == true)
@@ -263,7 +368,11 @@ class _TileView extends StatelessWidget {
                             color: const Color(0xFF10B981).withOpacity(0.1),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(Icons.verified, color: Color(0xFF10B981), size: 16),
+                          child: const Icon(
+                            Icons.verified,
+                            color: Color(0xFF10B981),
+                            size: 16,
+                          ),
                         ),
                     ],
                   ),
@@ -279,19 +388,29 @@ class _TileView extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         '(${item['reviews'] ?? 0} reviews)',
-                        style: const TextStyle(color: Colors.grey, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.location_city, color: Colors.grey[400], size: 16),
+                      Icon(
+                        Icons.location_city,
+                        color: Colors.grey[400],
+                        size: 16,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          item['location'] ?? 'Unknown location',
-                          style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          '${item['district']}$landmark',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 13,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -318,7 +437,9 @@ class _TileView extends StatelessWidget {
   }
 
   Widget _buildServiceChip(BuildContext context, dynamic service) {
-    final name = service is Map ? (service['name'] as String? ?? '') : service.toString();
+    final name = service is Map
+        ? (service['name'] as String? ?? '')
+        : service.toString();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -336,9 +457,11 @@ class _TileView extends StatelessWidget {
     );
   }
 
-  void _navigateToDetail(BuildContext context, Map<String, dynamic> item, Map<String, dynamic> user) {
-    
-    
+  void _navigateToDetail(
+    BuildContext context,
+    Map<String, dynamic> item,
+    Map<String, dynamic> user,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -373,7 +496,11 @@ class _GridView extends StatelessWidget {
     );
   }
 
-  Widget _buildGridItem(BuildContext context, Map<String, dynamic> item,  Map<String, dynamic> user) {
+  Widget _buildGridItem(
+    BuildContext context,
+    Map<String, dynamic> item,
+    Map<String, dynamic> user,
+  ) {
     return GestureDetector(
       onTap: () => _navigateToDetail(context, item, user),
       child: Container(
@@ -392,9 +519,29 @@ class _GridView extends StatelessWidget {
                   topRight: Radius.circular(15),
                 ),
                 child: CachedNetworkImage(
-                  imageUrl: item['images']?[0] ?? '',
+                  imageUrl:
+                      (item['images'] is List &&
+                          (item['images'] as List).isNotEmpty)
+                      ? item['images'][0] as String
+                      : '',
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  memCacheWidth: 240,
+                  placeholder: (context, url) => Shimmer.fromColors(
+                    baseColor: Theme.of(context).colorScheme.surfaceBright,
+                    highlightColor: Theme.of(context).colorScheme.surfaceDim,
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      color: Colors.white,
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    height: 120,
+                    width: 120,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.error),
+                  ),
                 ),
               ),
             ),
@@ -409,18 +556,24 @@ class _GridView extends StatelessWidget {
                       item['name'] ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      item['location'] ?? '',
+                      item['district'] ?? '',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 12),
                     ),
                     const SizedBox(height: 4),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.primary,
                         borderRadius: BorderRadius.circular(20),
@@ -428,11 +581,19 @@ class _GridView extends StatelessWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.star, color: Colors.yellow, size: 12),
+                          const Icon(
+                            Icons.star,
+                            color: Colors.yellow,
+                            size: 12,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             (item['rating'] ?? 0.0).toStringAsFixed(1),
-                            style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ],
                       ),
@@ -447,8 +608,11 @@ class _GridView extends StatelessWidget {
     );
   }
 
-  void _navigateToDetail(BuildContext context, Map<String, dynamic> item,  Map<String, dynamic> user) {
-    
+  void _navigateToDetail(
+    BuildContext context,
+    Map<String, dynamic> item,
+    Map<String, dynamic> user,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -477,7 +641,13 @@ class _ListView extends StatelessWidget {
     );
   }
 
-  Widget _buildListItem(BuildContext context, Map<String, dynamic> item,  Map<String, dynamic> user) {
+  Widget _buildListItem(
+    BuildContext context,
+    Map<String, dynamic> item,
+    Map<String, dynamic> user,
+  ) {
+    var land = item['landmark'];
+    var landmark = land != null ? ', $land' : '';
     return GestureDetector(
       onTap: () => _navigateToDetail(context, item, user),
       child: Container(
@@ -501,14 +671,25 @@ class _ListView extends StatelessWidget {
                 bottomLeft: Radius.circular(15),
               ),
               child: CachedNetworkImage(
-                imageUrl: item['images']?[0] ?? '',
+                imageUrl:
+                    (item['images'] is List &&
+                        (item['images'] as List).isNotEmpty)
+                    ? item['images'][0] as String
+                    : '',
                 height: 120,
                 width: 120,
                 fit: BoxFit.cover,
+                memCacheWidth: 240,
+                memCacheHeight: 240,
+                fadeInDuration: const Duration(milliseconds: 200),
                 placeholder: (context, url) => Shimmer.fromColors(
                   baseColor: Theme.of(context).colorScheme.surfaceBright,
                   highlightColor: Theme.of(context).colorScheme.surfaceDim,
-                  child: Container(width: 120, height: 120, color: Colors.white),
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    color: Colors.white,
+                  ),
                 ),
                 errorWidget: (_, __, ___) => Container(
                   height: 120,
@@ -529,7 +710,10 @@ class _ListView extends StatelessWidget {
                       item['name'] ?? '',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Row(
@@ -543,15 +727,18 @@ class _ListView extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           '(${item['reviews'] ?? 0} reviews)',
-                          style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      item['location'] ?? 'Unknown location',
+                      '${item['district']}$landmark',
                       style: const TextStyle(color: Colors.grey, fontSize: 13),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
@@ -564,8 +751,11 @@ class _ListView extends StatelessWidget {
     );
   }
 
-  void _navigateToDetail(BuildContext context, Map<String, dynamic> item, Map<String, dynamic> user) {
-    
+  void _navigateToDetail(
+    BuildContext context,
+    Map<String, dynamic> item,
+    Map<String, dynamic> user,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(

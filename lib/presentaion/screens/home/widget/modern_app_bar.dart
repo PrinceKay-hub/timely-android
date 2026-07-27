@@ -41,7 +41,6 @@ class ModernAppBar extends StatelessWidget {
           ),
           child: Column(
             children: [
-              SizedBox(height: 20,),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

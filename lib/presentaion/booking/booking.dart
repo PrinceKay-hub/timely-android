@@ -1,8 +1,10 @@
+import 'package:booking/core/services/review_service.dart';
 import 'package:booking/presentaion/booking/cubit/booking_cubit.dart';
 import 'package:booking/presentaion/booking/cubit/booking_form_cubit.dart';
 import 'package:booking/presentaion/booking/widget/booking_bottom_bar.dart';
 import 'package:booking/presentaion/booking/widget/booking_form.dart';
 import 'package:booking/presentaion/booking/widget/booking_header.dart';
+import 'package:booking/presentaion/user/cubit/user_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -44,8 +46,10 @@ class BookingScreenView extends StatelessWidget {
         BlocListener<BookingCubit, BookingState>(
           listener: (context, state) {
             if (state is BookingSuccess) {
+            final  userCubit = context.read<UserCubit>();
 
               _showSuccessDialog(context, state.message);
+              userCubit.loadUser();
 
             } else if (state is BookingError) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -60,30 +64,35 @@ class BookingScreenView extends StatelessWidget {
       ],
       child: BlocBuilder<BookingCubit, BookingState>(
         builder: (context, state) {
-          return Stack(
-            children: [
-              Scaffold(
-                body: Column(
-                  children: [
-                    const BookingHeader(),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: const BookingForm(),
-                      ),
+          return GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Stack(
+              children: [
+                SafeArea(
+                  child: Scaffold(
+                    body: Column(
+                      children: [
+                        const BookingHeader(),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child:  BookingForm(user: user,),
+                          ),
+                        ),
+                        BookingBottomBar(user: user),
+                      ],
                     ),
-                    BookingBottomBar(user: user),
-                  ],
-                ),
-              ),
-              if (state is BookingLoading)
-                Container(
-                  color: Colors.black54,
-                  child: const Center(
-                    child: CircularProgressIndicator(),
                   ),
                 ),
-            ],
+                if (state is BookingLoading)
+                  Container(
+                    color: Colors.black54,
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+              ],
+            ),
           );
         },
       ),
@@ -127,8 +136,9 @@ class BookingScreenView extends StatelessWidget {
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.pop(context); // close dialog
-                  Navigator.pop(context); // close booking screen
+                  Navigator.pop(context);
+                  Navigator.pop(context); 
+                  ReviewService().requestReviewIfEligible();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Theme.of(context).colorScheme.primary,

@@ -15,6 +15,8 @@ class ServiceRegistrationLoading extends ServiceRegistrationState {}
 
 class ServiceRegistrationSuccess extends ServiceRegistrationState {}
 
+class ServiceUpdateSuccess extends ServiceRegistrationState {}
+
 class ServiceDeletionSuccess extends ServiceRegistrationState {}
 
 class ServiceRegistrationError extends ServiceRegistrationState {
@@ -26,13 +28,13 @@ class ServiceRegistrationError extends ServiceRegistrationState {
   List<Object> get props => [message];
 }
 
-final class ServiceRegistrationDataLoaded extends ServiceRegistrationState {
-  final Map<String, dynamic>? serviceData;
 
-  const ServiceRegistrationDataLoaded(this.serviceData);
+final class ServiceRegistrationDataLoaded extends ServiceRegistrationState {
+  final List<Map<String, dynamic>> services;
 
   @override
-  List<Object> get props => [?serviceData];
+  List<Object> get props => [services];
+  const ServiceRegistrationDataLoaded(this.services);
 }
 
 

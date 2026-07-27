@@ -875,7 +875,7 @@ class _ReBookState extends State<ReBook> {
                       serviceId: widget.data['id'] ?? '',
                       serviceName: widget.data['serviceName'] ?? 'Service',
                       providerId: widget.data['providerId'] ?? '',
-                      userId: widget.data['userId'], // Get actual user ID
+                      userId: widget.data['userId'], 
                       appointmentDate: appointmentDateTime,
                       timeSlot: timeSlot,
                       serviceOption: ServiceOption(
@@ -883,7 +883,7 @@ class _ReBookState extends State<ReBook> {
                         title: selectedService['name'] ?? 'Service Option',
                         durationMinutes: selectedService['duration'] ?? 60,
                       ),
-                      totalAmount: totalPrice,
+                      totalAmount: totalPrice.toString(),
                       createdAt: DateTime.now(),
                       userName: widget.data['userName'] ?? 'User',
                       participants: [widget.data['providerId'], widget.data['userId'],],
@@ -892,7 +892,8 @@ class _ReBookState extends State<ReBook> {
                       longitude: widget.data['longitude'] ?? 0.0,
                       workingDays: widget.data['workingDays'],
                       workingHours: widget.data['workingHours'],
-                      services: services
+                      services: services,
+                      phone: widget.data['phone']
                     );
                     cubit.createBooking(booking);
                     

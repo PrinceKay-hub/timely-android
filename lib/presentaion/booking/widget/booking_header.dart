@@ -50,7 +50,7 @@ class BookingHeader extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      Icons.more_vert,
+                      Icons.more_horiz,
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
@@ -74,10 +74,11 @@ class BookingHeader extends StatelessWidget {
                   child: CachedNetworkImage(
                     imageUrl: providerData['images']?.isNotEmpty == true
                         ? providerData['images'][0]
-                        : 'https://via.placeholder.com/80',
+                        : Icon(Icons.business),
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
+                    memCacheWidth: 150,
                   ),
                 ),
                 const SizedBox(width: 16),

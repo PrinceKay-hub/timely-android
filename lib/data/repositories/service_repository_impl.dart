@@ -39,10 +39,10 @@ class ServiceRepositoryImpl extends ServiceRepository {
   @override
   Future<void> updateService(
     String serviceId,
-    Map<String, dynamic> service,
+    ServiceEntity service,
   ) async {
     try {
-      final serviceData = service;
+      final serviceData = ServiceModel.fromEntity(service).toJson();
 
       await _firestore
           .collection('services')
@@ -110,26 +110,22 @@ class ServiceRepositoryImpl extends ServiceRepository {
   }
 
   @override
-  Future<Map<String, dynamic>?> getServicesByProvider(String providerId) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('services')
-          .where('providerId', isEqualTo: providerId)
-          .limit(1) // ensure we only fetch one document
-          .get();
+  Future<List<Map<String, dynamic>>> getServicesByProvider(String providerId) async {
+  try {
+    final querySnapshot = await _firestore
+        .collection('services')
+        .where('providerId', isEqualTo: providerId)
+        .get(); // no limit
 
-      if (querySnapshot.docs.isEmpty) {
-        return null; // or throw a custom exception if you prefer
-      }
-
-      final doc = querySnapshot.docs.first;
+    return querySnapshot.docs.map((doc) {
       final data = doc.data();
-      data['id'] = doc.id; // add document ID to the map
+      data['id'] = doc.id;
       return data;
-    } catch (e) {
-      throw Exception('Failed to get provider service: $e');
-    }
+    }).toList();
+  } catch (e) {
+    throw Exception('Failed to get provider services: $e');
   }
+}
 
 
   @override

@@ -26,7 +26,7 @@ class _ThemeAppState extends State<ThemeApp> {
     return BlocBuilder<ThemeCubit, ThemeState>(
       builder: (context, state) {
         return MaterialApp.router(
-          title: 'Timely Booking',
+          title: 'Timely',
           theme: AppThemes.lightTheme,
           darkTheme: AppThemes.darkTheme,
           themeMode: _getThemeMode(state.themeMode),

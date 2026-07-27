@@ -3,7 +3,7 @@ import 'package:booking/domain/entities/service_entity.dart';
 abstract class ServiceRepository {
   Future<String> createService(ServiceEntity service);
   
-  Future<void> updateService(String serviceId, Map<String, dynamic>  service);
+  Future<void> updateService(String serviceId, ServiceEntity service);
   
   Future<void> deleteService(String serviceId);
   
@@ -11,7 +11,7 @@ abstract class ServiceRepository {
 
   Future<void> deleteImage(String serviceId, Map<String, dynamic> service);
   
-  Future<Map<String, dynamic>?>  getServicesByProvider(String providerId);
+  Future<List<Map<String, dynamic>>>  getServicesByProvider(String providerId);
   
   Future<List>getAllServices();
   

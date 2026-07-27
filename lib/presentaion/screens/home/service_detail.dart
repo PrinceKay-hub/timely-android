@@ -1,13 +1,17 @@
 import 'package:booking/core/services/location_service.dart';
+import 'package:booking/data/models/portfolio_model.dart';
 import 'package:booking/presentaion/booking/booking.dart';
 import 'package:booking/presentaion/common/pages/error_screen.dart';
 import 'package:booking/presentaion/common/pages/gallery_widget.dart';
 import 'package:booking/presentaion/common/pages/loading_screen.dart';
 import 'package:booking/presentaion/common/widgets/working_hours_display.dart';
 import 'package:booking/presentaion/provider/cubit/service_detail/service_detail_cubit.dart';
+import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_bloc.dart';
+import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_state.dart';
 import 'package:booking/presentaion/review/cubit/review_cubit.dart';
 import 'package:booking/presentaion/screens/favorite/bloc/favorite_bloc.dart';
 import 'package:booking/presentaion/screens/favorite/bloc/favorite_state.dart';
+import 'package:booking/presentaion/screens/home/detail/widget/portfolio_viewer.dart';
 import 'package:booking/presentaion/user/cubit/user_cubit.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -110,6 +114,15 @@ class _ServiceDetailState extends State<ServiceDetail> {
     super.initState();
   }
 
+  String formatDuration(int minutes) {
+    if (minutes >= 60 && minutes % 60 == 0) {
+      return '${minutes ~/ 60} hr';
+    } else if (minutes > 60) {
+      return '${minutes ~/ 60}h ${minutes % 60}m';
+    }
+    return '$minutes mins';
+  }
+
   @override
   Widget build(BuildContext context) {
     IconData getCategoryIcon(String category) {
@@ -128,7 +141,7 @@ class _ServiceDetailState extends State<ServiceDetail> {
           return Icons.check; // default icon for unknown amenities
       }
     }
-
+  
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -140,6 +153,7 @@ class _ServiceDetailState extends State<ServiceDetail> {
               return ErrorScreen(error: state.message);
             } else if (state is ServiceDetailLoaded) {
               final data = state.serviceData;
+              final landmark = data['landmark'] != null ? ', ${data['landmark']}' : '';
               reviewCubit.fetcReviews(data['providerId']);
               return BlocBuilder<UserCubit, UserState>(
                 builder: (context, state) {
@@ -427,7 +441,7 @@ class _ServiceDetailState extends State<ServiceDetail> {
                                               SizedBox(width: 8),
                                               Expanded(
                                                 child: Text(
-                                                  data['location'],
+                                                  '${data['district']}$landmark',
                                                   style: TextStyle(
                                                     color: Colors.grey,
                                                     fontSize: 14,
@@ -679,10 +693,7 @@ class _ServiceDetailState extends State<ServiceDetail> {
                                   tabs: [
                                     Tab(text: 'About'),
                                     Tab(text: 'Reviews'),
-                                    //Tab(text: 'Portfolio'),
-                                    //Tab(text: 'PORTFOLIO'),
-                                    //Tab(text: 'GIFT CARDS'),
-                                    //Tab(text: 'DETAILS'),
+                                    Tab(text: 'Portfolio'),
                                   ],
                                 ),
                               ),
@@ -694,12 +705,7 @@ class _ServiceDetailState extends State<ServiceDetail> {
                                 children: [
                                   _buildAboutTab(data),
                                   _buildReviewsTab(data),
-                                  // _buildPortfolioTab(),
-                                  //_buildServicesTab(),
-                                  //Center(child: Text('Reviews')),
-                                  // Center(child: Text('Portfolio')),
-                                  //Center(child: Text('Gift Cards')),
-                                  //Center(child: Text('Details')),
+                                   _buildPortfolioTab(data),
                                 ],
                               ),
                             ),
@@ -817,7 +823,7 @@ class _ServiceDetailState extends State<ServiceDetail> {
               return _buildServiceItem(
                 service['name'],
                 service['price'].toString(),
-                service['duration'].toString(),
+                formatDuration(service['duration']),
               );
             },
           ),
@@ -1102,21 +1108,159 @@ class _ServiceDetailState extends State<ServiceDetail> {
   }
 
   // Portfolio Tab Content
-  /* Widget _buildPortfolioTab() {
-    return GridView.builder(
-      padding: const EdgeInsets.all(20),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.85,
-      ),
-      itemCount: 12,
-      itemBuilder: (context, index) {
-        return _buildPortfolioItem(index);
+  Widget _buildPortfolioTab(Map<String, dynamic> data) {
+    return BlocBuilder<PortfolioCubit, PortfolioState>(
+      builder: (context, state) {
+        if (state is PortfolioLoading) {
+          return Center(child: CircularProgressIndicator(strokeWidth: 2));
+        } else if (state is PortfolioLoaded) {
+          final port = state.images;
+
+            if (port.isEmpty) {
+              
+              return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.image_outlined, color: Colors.grey, size: 30,),
+                  SizedBox(height: 10,),
+                  Text('No Portfolio Yet', 
+                  style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold
+                  ),
+                ),
+                SizedBox(height: 5,),
+                Text("This service hasn't added any portfolio images.", 
+                  style: TextStyle(
+                    color: Colors.grey, 
+                    fontSize: 14,
+                  ),
+                  )
+                ],
+              ),
+            );
+            }
+
+          return GridView.builder(
+            padding: const EdgeInsets.all(20),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 0.85,
+            ),
+            itemCount: port.length,
+            itemBuilder: (context, index) {
+              final newList = port[index];
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PortfolioViewerScreen(
+                        serviceId: data['id'],
+                        initialIndex: index,
+                      ),
+                    ),
+                  );
+                },
+                child: _buildPortfolioItem(newList),
+              );
+            },
+          );
+        } else if (state is PortfolioError) {
+          return Center(child: Text(state.message));
+        }
+        return SizedBox.shrink();
       },
     );
-  }*/
+  }
+
+  Widget _buildPortfolioItem(PortfolioImage image) {
+    final likes = image.likes!.isEmpty ? 0 : image.likes!.length.toString();
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            CachedNetworkImage(imageUrl: image.imageUrl, fit: BoxFit.cover),
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                ),
+              ),
+            ),
+            /* Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  category,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),*/
+            Positioned(
+              bottom: 8,
+              left: 8,
+              right: 8,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    image.caption,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.favorite, color: Colors.white, size: 12),
+                      SizedBox(width: 4),
+
+                      Text(
+                        likes.toString(),
+                        style: TextStyle(color: Colors.white, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildServiceItem(String name, String price, String duration) {
     return Container(
@@ -1150,19 +1294,27 @@ class _ServiceDetailState extends State<ServiceDetail> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$duration mins',
+                  '$duration',
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],
             ),
           ),
-          Text(
-            '₵$price',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Color(0xFF8B5CF6),
-            ),
+          Column(
+            children: [
+              Text(
+                'from',
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              Text(
+                '₵$price',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Color(0xFF8B5CF6),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1193,201 +1345,6 @@ class _ServiceDetailState extends State<ServiceDetail> {
       ),
     );
   }
-
-  /* Widget _buildPortfolioItem(int index) {
-    final categories = ['Haircut', 'Beard', 'Color', 'Style'];
-    final category = categories[index % categories.length];
-
-    return GestureDetector(
-      onTap: () {
-        _showPortfolioDetail(index);
-      },
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 5,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(15),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.network(
-                'https://via.placeholder.com/200x240',
-                fit: BoxFit.cover,
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-                  ),
-                ),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF8B5CF6),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    category,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 8,
-                left: 8,
-                right: 8,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Modern Style',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: const [
-                        Icon(Icons.favorite, color: Colors.white, size: 12),
-                        SizedBox(width: 4),
-                        Text(
-                          '124',
-                          style: TextStyle(color: Colors.white, fontSize: 11),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }*/
-
-  /*void _showPortfolioDetail(int index) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                  child: Image.network(
-                    'https://via.placeholder.com/400x400',
-                    width: double.infinity,
-                    height: 300,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.close, size: 20),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Modern Fade Style',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'By Marcus Johnson',
-                    style: TextStyle(
-                      color: Color(0xFF8B5CF6),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'A clean modern fade with textured top. Perfect for professional and casual settings.',
-                    style: TextStyle(color: Colors.grey, height: 1.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDE9FE),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'Haircut',
-                          style: TextStyle(
-                            color: Color(0xFF8B5CF6),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      const Icon(Icons.favorite, color: Colors.red, size: 20),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '124',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }*/
 
   String formatDateDifference(DateTime createdDate) {
     final DateTime now = DateTime.now();

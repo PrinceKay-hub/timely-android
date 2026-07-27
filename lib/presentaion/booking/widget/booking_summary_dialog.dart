@@ -5,7 +5,7 @@ class BookingSummaryDialog extends StatelessWidget {
   final String serviceName;
   final DateTime date;
   final String timeString;
-  final int totalPrice;
+  final String totalPrice;
   final VoidCallback onConfirm;
 
   const BookingSummaryDialog({
@@ -32,7 +32,7 @@ class BookingSummaryDialog extends StatelessWidget {
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             const Divider(),
-            _buildRow('Service:', serviceName),
+            _buildServiceRow('Service:', serviceName),
             _buildRow('Date:', DateFormat('MMMM d, yyyy').format(date)),
             _buildRow('Time:', timeString),
             const SizedBox(height: 16),
@@ -69,13 +69,37 @@ class BookingSummaryDialog extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: isTotal ? const TextStyle(fontSize: 16) : null),
+          Text(label, style: isTotal ? const TextStyle(fontSize: 16) : const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           Text(
             value,
             style: TextStyle(
               fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
               fontSize: isTotal ? 20 : 15,
               color: isTotal ? const Color(0xFF8B5CF6) : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  Widget _buildServiceRow(String label, String value, {bool isTotal = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Container(
+            width: 200,
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
+                fontSize: isTotal ? 20 : 15,
+                color: isTotal ? const Color(0xFF8B5CF6) : null,
+              ),
             ),
           ),
         ],

@@ -7,18 +7,16 @@ class BookingFormCubit extends Cubit<BookingFormState> {
   final Map<String, dynamic> providerData;
   final List<Map<String, dynamic>> services;
 
-  BookingFormCubit({
-    required this.providerData,
-    required this.services,
-  }) : super(
-          BookingFormState(
-            selectedDate: _getInitialDate(providerData),
-            isDateWorkingDay: _checkIfWorkingDay(
-              _getInitialDate(providerData),
-              providerData,
-            ),
+  BookingFormCubit({required this.providerData, required this.services})
+    : super(
+        BookingFormState(
+          selectedDate: _getInitialDate(providerData),
+          isDateWorkingDay: _checkIfWorkingDay(
+            _getInitialDate(providerData),
+            providerData,
           ),
-        );
+        ),
+      );
 
   // Helper methods (same as before)
   static DateTime _getInitialDate(Map<String, dynamic> providerData) {
@@ -30,7 +28,11 @@ class BookingFormCubit extends Cubit<BookingFormState> {
     }
     // Find first working day of current month
     //final firstOfMonth = DateTime(today.year, today.month, 1);
-    for (int day = 1; day <= DateTime(today.year, today.month + 1, 0).day; day++) {
+    for (
+      int day = 1;
+      day <= DateTime(today.year, today.month + 1, 0).day;
+      day++
+    ) {
       final date = DateTime(today.year, today.month, day);
       if (workingDayNumbers.contains(date.weekday)) {
         return date;
@@ -39,26 +41,37 @@ class BookingFormCubit extends Cubit<BookingFormState> {
     return todayDateOnly; // fallback
   }
 
-  static bool _checkIfWorkingDay(DateTime date, Map<String, dynamic> providerData) {
+  static bool _checkIfWorkingDay(
+    DateTime date,
+    Map<String, dynamic> providerData,
+  ) {
     final workingDayNumbers = _getWorkingDayNumbers(providerData);
     return workingDayNumbers.contains(date.weekday);
   }
 
   static Set<int> _getWorkingDayNumbers(Map<String, dynamic> providerData) {
-    final List<String> workingDayStrings =
-        List<String>.from(providerData['workingDays'] ?? []);
+    final List<String> workingDayStrings = List<String>.from(
+      providerData['workingDays'] ?? [],
+    );
     return _convertWeekdayStringsToInt(workingDayStrings);
   }
 
   static Set<int> _convertWeekdayStringsToInt(List<String> dayStrings) {
     const Map<String, int> dayMap = {
-      'Mon': 1, 'Monday': 1,
-      'Tue': 2, 'Tuesday': 2,
-      'Wed': 3, 'Wednesday': 3,
-      'Thu': 4, 'Thursday': 4,
-      'Fri': 5, 'Friday': 5,
-      'Sat': 6, 'Saturday': 6,
-      'Sun': 7, 'Sunday': 7,
+      'Mon': 1,
+      'Monday': 1,
+      'Tue': 2,
+      'Tuesday': 2,
+      'Wed': 3,
+      'Wednesday': 3,
+      'Thu': 4,
+      'Thursday': 4,
+      'Fri': 5,
+      'Friday': 5,
+      'Sat': 6,
+      'Saturday': 6,
+      'Sun': 7,
+      'Sunday': 7,
     };
     return dayStrings
         .where((day) => dayMap.containsKey(day))
@@ -66,25 +79,34 @@ class BookingFormCubit extends Cubit<BookingFormState> {
         .toSet();
   }
 
+  void toggleService(int index) {
+    final current = state.selectedServiceIndices;
+    List<int> newIndices;
+    if (current.contains(index)) {
+      newIndices = List.from(current)..remove(index);
+    } else {
+      newIndices = List.from(current)..add(index);
+    }
+    emit(state.copyWith(selectedServiceIndices: newIndices));
+  }
+
   // Service selection
-  void selectService(int index) {
-    final price = services[index]['price'] as int;
-    emit(state.copyWith(
-      selectedServiceIndex: index,
-      totalPrice: price,
-    ));
+  void selectPhone(String phone) {
+    emit(state.copyWith(phone: phone));
   }
 
   // Date selection
   void selectDate(DateTime date) {
     final isWorkingDay = _checkIfWorkingDay(date, providerData);
-    emit(state.copyWith(
-      selectedDate: date,
-      isDateWorkingDay: isWorkingDay,
-      selectedTimeIndex: -1,
-      selectedTimeString: '',
-      selectedTimeDateTime: null,
-    ));
+    emit(
+      state.copyWith(
+        selectedDate: date,
+        isDateWorkingDay: isWorkingDay,
+        selectedTimeIndex: -1,
+        selectedTimeString: '',
+        selectedTimeDateTime: null,
+      ),
+    );
   }
 
   // Time slot selection
@@ -96,16 +118,19 @@ class BookingFormCubit extends Cubit<BookingFormState> {
       slot['hour'] as int,
       slot['minute'] as int,
     );
-    emit(state.copyWith(
-      selectedTimeIndex: index,
-      selectedTimeString: slot['display'] as String,
-      selectedTimeDateTime: timeDateTime,
-    ));
+    emit(
+      state.copyWith(
+        selectedTimeIndex: index,
+        selectedTimeString: slot['display'] as String,
+        selectedTimeDateTime: timeDateTime,
+      ),
+    );
   }
 
   // Generate time slots (pure function)
   List<Map<String, dynamic>> generateTimeSlots() {
-    final workingHours = providerData['workingHours'] ??
+    final workingHours =
+        providerData['workingHours'] ??
         {'startHour': 8, 'startMinute': 0, 'endHour': 18, 'endMinute': 0};
 
     final startHour = workingHours['startHour'] ?? 9;
@@ -158,9 +183,40 @@ class BookingFormCubit extends Cubit<BookingFormState> {
         });
       }
 
-      currentTime = currentTime.add(const Duration(hours: 1));
+      currentTime = currentTime.add(const Duration(minutes: 30));
     }
 
     return slots;
+  }
+
+  // Add this helper method inside BookingFormCubit
+  double _parseServicePrice(dynamic price) {
+    if (price is num) return price.toDouble();
+    final str = price.toString().trim();
+    // Try direct parse
+    final parsed = double.tryParse(str);
+    if (parsed != null) return parsed;
+    // Extract first number from a range like "150 - 300"
+    final match = RegExp(r'(\d+(\.\d+)?)').firstMatch(str);
+    if (match != null) {
+      final value = double.tryParse(match.group(1)!);
+      if (value != null) return value;
+    }
+    return 0.0;
+  }
+
+  // Replace getTotalPrice() with this:
+  String getTotalPrice() {
+    double sum = 0.0;
+    for (final index in state.selectedServiceIndices) {
+      final service = services[index];
+      final price = service['price'];
+      sum += _parseServicePrice(price);
+    }
+    return sum.toStringAsFixed(2);
+  }
+
+  List<Map<String, dynamic>> getSelectedServices() {
+    return state.selectedServiceIndices.map((i) => services[i]).toList();
   }
 }

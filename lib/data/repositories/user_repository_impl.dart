@@ -51,6 +51,22 @@ class UserRepositoryImpl extends UserRepository {
   }
 
   @override
+  Future<void> updateUserContact(String phone, ) async {
+    try {
+      final String userId = _firebaseAuth.currentUser!.uid;
+
+      
+      await _firestore.collection('users').doc(userId).set(
+        {
+          'phone': phone,
+        }, SetOptions(merge: true)
+      );
+    } catch (e) {
+      throw Exception('Failed to update user: $e');
+    }
+  }
+
+  @override
   Future<void> updateProviderProfile({
   required String providerId,
   String? serviceId,

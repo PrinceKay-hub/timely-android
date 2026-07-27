@@ -58,6 +58,8 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
   }
 
   Widget _buildResultCard(BuildContext context, Map<String, dynamic> service) {
+    var land = service['landmark'];
+     var landmark = land != null ? ', $land' : '';
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -98,6 +100,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     height: 160,
                     width: double.infinity,
                     fit: BoxFit.cover,
+                    memCacheWidth: 200,
                     errorWidget: (context, url, error) {
                       return Container(
                         height: 160,
@@ -211,7 +214,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          service['location'] ?? 'Unknown location',
+                          '${service['district']}$landmark',
                           style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 13,

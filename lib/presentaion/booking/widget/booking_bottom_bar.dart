@@ -1,6 +1,7 @@
 import 'package:booking/presentaion/booking/cubit/booking_cubit.dart';
 import 'package:booking/presentaion/booking/cubit/booking_form_cubit.dart';
 import 'package:booking/presentaion/booking/widget/booking_summary_dialog.dart';
+import 'package:booking/presentaion/user/cubit/user_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:booking/domain/entities/booking_entity.dart';
@@ -13,8 +14,11 @@ class BookingBottomBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final formCubit = context.watch<BookingFormCubit>();
     final formState = formCubit.state;
-    final totalPrice = formState.totalPrice;
     final isDateWorkingDay = formState.isDateWorkingDay;
+
+    // ✅ Compute total price from selected services
+    final totalPrice = formCubit.getTotalPrice();
+    final selectedCount = formState.selectedServiceIndices.length;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -52,9 +56,10 @@ class BookingBottomBar extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                if (formState.selectedServiceIndex == null) {
+                // ✅ Validate at least one service
+                if (selectedCount == 0) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Please select a service')),
+                    const SnackBar(content: Text('Please select at least one service')),
                   );
                   return;
                 }
@@ -72,7 +77,6 @@ class BookingBottomBar extends StatelessWidget {
                   );
                   return;
                 }
-
                 _showSummaryDialog(context, formCubit, formState, user);
               },
               style: ElevatedButton.styleFrom(
@@ -102,17 +106,32 @@ class BookingBottomBar extends StatelessWidget {
     BookingFormCubit formCubit,
     BookingFormState formState,
     Map<String, dynamic> user,
-    ) {
+  ) {
     final globalCubit = context.read<BookingCubit>();
+    final client = context.read<UserCubit>();
     final providerData = formCubit.providerData;
 
-    final selectedService = formCubit.services[formState.selectedServiceIndex!];
-    final appointmentDateTime = formState.selectedTimeDateTime!;
+    final selectedServices = formCubit.getSelectedServices();
+    final combinedName = selectedServices.map((s) => s['name'] as String).join(' + ');
+    final combinedDuration = selectedServices.fold<int>(
+      0,
+      (sum, s) => sum + (s['duration'] as int),
+    );
+    final combinedPrice = double.parse(formCubit.getTotalPrice());
 
+    final appointmentDateTime = formState.selectedTimeDateTime!;
     final timeSlot = TimeSlot(
       displayTime: formState.selectedTimeString,
       time: appointmentDateTime,
     );
+
+    String? phone = user['phone'] ?? formState.phone;
+    if (phone == null || phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please add phone number')),
+      );
+      return;
+    }
 
     final booking = BookingEntity(
       id: '',
@@ -123,11 +142,11 @@ class BookingBottomBar extends StatelessWidget {
       appointmentDate: appointmentDateTime,
       timeSlot: timeSlot,
       serviceOption: ServiceOption(
-        price: selectedService['price'] ?? 0,
-        title: selectedService['name'] ?? 'Service Option',
-        durationMinutes: selectedService['duration'] ?? 60,
+        price: combinedPrice.toString(),
+        title: combinedName,
+        durationMinutes: combinedDuration,
       ),
-      totalAmount: formState.totalPrice,
+      totalAmount: formCubit.getTotalPrice(),
       createdAt: DateTime.now(),
       userName: user['displayName'] ?? 'User',
       participants: [providerData['providerId'], user['id']],
@@ -138,18 +157,21 @@ class BookingBottomBar extends StatelessWidget {
       workingHours: providerData['workingHours'],
       services: formCubit.services,
       reminderSent: false,
+      phone: phone,
     );
 
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => BookingSummaryDialog(
-        serviceName: selectedService['name'] ?? 'Service',
+        // Show combined name in summary
+        serviceName: combinedName,
         date: formState.selectedDate,
         timeString: formState.selectedTimeString,
-        totalPrice: formState.totalPrice,
+        totalPrice: formCubit.getTotalPrice(),
         onConfirm: () {
-          Navigator.pop(context); // close summary dialog
+          Navigator.pop(context);
+          client.updateUserContact(phone);
           globalCubit.createBooking(booking);
         },
       ),

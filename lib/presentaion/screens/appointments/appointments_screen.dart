@@ -13,6 +13,7 @@ import 'package:booking/presentaion/screens/appointments/widgets/stat_badge.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AppointmentsScreen extends StatefulWidget {
   final Map<String, dynamic> user;
@@ -183,7 +184,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               StatBadge(count: pending, label: 'Pending'),
-              StatBadge(count: confirmed, label: 'Confirmed'),
+              StatBadge(count: confirmed, label: 'Upcoming'),
               StatBadge(count: cancelled, label: 'Cancelled'),
             ],
           ),
@@ -208,7 +209,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         isScrollable: false,
         tabs: const [
           Tab(text: 'Pending'),
-          Tab(text: 'Confirmed'),
+          Tab(text: 'Upcoming'),
           Tab(text: 'Cancelled'),
           Tab(text: 'Completed'),
         ],
@@ -262,6 +263,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
             onDelete: () => _showDeleteDialog(booking),
             onWriteReview: () => _showReviewDialog(booking),
             onBookAgain: () => _navigateToRebook(booking),
+            onClientCall: () => _callClient(booking),
           ),
         );
       },
@@ -317,6 +319,44 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
         },
       ),
     );
+  }
+
+  void _callClient(Map<String, dynamic> booking) async{
+    try{
+      if (booking['phone'] == null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(
+            SnackBar(
+              backgroundColor: Colors.red,
+              showCloseIcon: true,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadiusGeometry.circular(
+                      10,
+                    ),
+              ),
+              content: const Text(
+                'Phone number not available',
+              ),
+            ),
+          );
+          return;
+        }
+        ;
+        final Uri url = Uri(
+          scheme: 'tel',
+          path: booking['phone'],
+        );
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url);
+        } else {
+          throw 'Could not launch $url';
+        }
+    } catch (e) {
+
+    }
   }
 
   void _showDeleteDialog(Map<String, dynamic> booking) {

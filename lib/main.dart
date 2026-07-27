@@ -32,6 +32,7 @@ import 'package:booking/presentaion/user/cubit/user_cubit.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -41,22 +42,29 @@ import 'package:image_picker_platform_interface/image_picker_platform_interface.
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Edge-to-edge: draw behind system bars, keep icons visible.
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+
   await SharedPreferences.getInstance();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  
+
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-  
+
   final LocalNotificationService notificationService = LocalNotificationService();
-  
   notificationService.initInfo();
 
-  // Initialize Hive for Flutter
   await Hive.initFlutter();
-  
-  // Open a box (like opening a table)
   await Hive.openBox('myBox');
 
-  // Enable the Android photo picker before using ImagePicker
   final ImagePickerPlatform imagePickerImplementation = ImagePickerPlatform.instance;
   if (imagePickerImplementation is ImagePickerAndroid) {
     imagePickerImplementation.useAndroidPhotoPicker = true;
@@ -94,7 +102,7 @@ class MyApp extends StatelessWidget {
             storageServices: context.read<StorageService>(),
           ),
         ),
-
+    
         RepositoryProvider(create: (context) => BookingRepositoryImpl()),
         RepositoryProvider<LocalNotificationService>.value(
           value: notificationService,

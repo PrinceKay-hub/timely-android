@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
 class LocationService {
@@ -65,5 +67,28 @@ class LocationService {
     } else {
       return '${distanceInKm.toStringAsFixed(1)} km';
     }
+  }
+
+  Future<String?> getAddressFromCoordinates(double latitude, double longitude) async {
+    String address = '';
+    try {
+        final placemarks = await placemarkFromCoordinates(
+          latitude,
+          longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final p = placemarks.first;
+          address = [
+            p.subAdministrativeArea,
+            p.locality,
+            p.administrativeArea,
+          ].where((e) => e != null && e.isNotEmpty).join(', ');
+        }
+
+      } catch (geoError) {
+        // Reverse geocoding failed, fall back to coordinates only
+        debugPrint('Reverse geocoding failed: $geoError');
+      }
+    return address;
   }
 }

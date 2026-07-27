@@ -1,7 +1,10 @@
 const functions = require("firebase-functions");
+const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const crypto = require("crypto");
+const {defineSecret} = require("firebase-functions/params");
+const {fal} = require("@fal-ai/client");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
@@ -14,6 +17,19 @@ const db = admin.firestore();
 // { "token": "device_token", "title": "Hello", "body": "World" }
 exports.sendNotification =
 functions.https.onRequest(async (req, res) => {
+  // CORS: allow the browser to call this from your web admin.
+  // Restrict this to your actual domain(s) in production instead of "*".
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // Browsers send a preflight OPTIONS request before the real POST
+  // whenever a custom header (like Authorization) is involved. It expects
+  // a 204 with the CORS headers above and no body.
+  if (req.method === "OPTIONS") {
+    return res.status(204).send("");
+  }
+
   if (req.method !== "POST") {
     return res.status(405).send("Method Not Allowed");
   }
@@ -60,6 +76,85 @@ functions.https.onRequest(async (req, res) => {
     res.status(401).send("Unauthorized");
   }
 });
+
+exports.sendBroadcastNotification =
+  functions.https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    if (req.method === "OPTIONS") {
+      return res.status(204).send("");
+    }
+    if (req.method !== "POST") {
+      return res.status(405).send("Method Not Allowed");
+    }
+
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).send("Unauthorized");
+    }
+    const idToken = authHeader.split("Bearer ")[1];
+
+    try {
+      await admin.auth().verifyIdToken(idToken);
+
+      const {title, body, audience} = req.body;
+      if (!title || !body || !audience) {
+        return res.status(400).send("Missing fields");
+      }
+      if (!["all", "android", "ios"].includes(audience)) {
+        return res.status(400).send("Invalid audience");
+      }
+
+      let query = admin.firestore().collection("users");
+      if (audience === "android") {
+        query = query.where("deviceInfo.deviceType", "==", "Android");
+      } else if (audience === "ios") {
+        query = query.where("deviceInfo.deviceType", "==", "iOS");
+      }
+
+      const snapshot = await query.get();
+      const tokens = snapshot.docs
+          .map((doc) => doc.data().fcmToken)
+          .filter((t) => typeof t === "string" && t.length > 0);
+
+      if (tokens.length === 0) {
+        return res.status(200).json(
+            {success: true, totalTokens: 0, successCount: 0, failureCount: 0});
+      }
+
+      // FCM allows max 500 tokens per multicast request.
+      const chunkSize = 500;
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (let i = 0; i < tokens.length; i += chunkSize) {
+        const chunk = tokens.slice(i, i + chunkSize);
+        const message = {
+          notification: {title, body},
+          tokens: chunk,
+          apns: {
+            payload: {aps: {"sound": "default"}},
+            headers: {"apns-priority": "10", "apns-push-type": "alert"},
+          },
+        };
+        const response = await admin.messaging().sendEachForMulticast(message);
+        successCount += response.successCount;
+        failureCount += response.failureCount;
+      }
+
+      res.status(200).json({
+        success: true,
+        totalTokens: tokens.length,
+        successCount,
+        failureCount,
+      });
+    } catch (error) {
+      console.error(error);
+      res.status(401).send("Unauthorized");
+    }
+  });
 
 
 // Schedule this function to run every 10 minutes
@@ -696,3 +791,214 @@ exports.computeServicePairs =
     console.log("Service pair recommendations updated.");
     return null;
   });
+
+
+// virtual tryon call function
+const FAL_API_KEY = defineSecret("FAL_API_KEY");
+
+exports.virtualHairstyleTryOn = onCall(
+    {
+      secrets: [FAL_API_KEY],
+      timeoutSeconds: 120,
+      memory: "512MiB",
+    },
+    async (request) => {
+      // ── Auth check ──────────────────────────────
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "You must be logged in.");
+      }
+
+      const uid = request.auth.uid;
+      const {imageBase64, hairstylePrompt, hairColor} = request.data;
+
+      if (!imageBase64 || !hairstylePrompt) {
+        throw new HttpsError(
+            "invalid-argument",
+            "imageBase64 and hairstylePrompt are required.",
+        );
+      }
+
+      // ── Daily usage check ────────────────────────
+      const DAILY_LIMIT = 3;
+      const today = new Date().toISOString().split("T")[0];
+      const usageRef = db
+          .collection("tryOnUsage")
+          .doc(uid)
+          .collection("daily")
+          .doc(today);
+
+      const usageSnap = await usageRef.get();
+      const currentCount = usageSnap.exists ? usageSnap.data().count : 0;
+
+      if (currentCount >= DAILY_LIMIT) {
+        throw new HttpsError(
+            "resource-exhausted",
+            "Daily limit reached for today. Come back tomorrow!",
+        );
+      }
+
+      // ── Increment usage count immediately ────────
+      await usageRef.set(
+          {
+            count: admin.firestore.FieldValue.increment(1),
+            lastUsed: admin.firestore.FieldValue.serverTimestamp(),
+            uid: uid,
+            date: today,
+          },
+          {merge: true},
+      );
+
+      const apiKey = FAL_API_KEY.value();
+      if (!apiKey) {
+        throw new HttpsError(
+            "failed-precondition",
+            "FAL_API_KEY is not configured.",
+        );
+      }
+
+      fal.config({credentials: apiKey});
+
+      try {
+        // Step 1: Upload image to fal storage first for better quality
+        const imageBuffer = Buffer.from(imageBase64, "base64");
+        const imageFile = new File([imageBuffer], "upload.jpg", {
+          type: "image/jpeg",
+        });
+        const uploadedUrl = await fal.storage.upload(imageFile);
+        console.log("Uploaded image URL:", uploadedUrl);
+
+        // Step 2: Switch to image-apps-v2 to prevent face alteration
+        const result = await fal.subscribe("fal-ai/image-apps-v2/hair-change", {
+          input: {
+            image_url: uploadedUrl,
+            target_hairstyle: hairstylePrompt,
+            hair_color: hairColor || "natural",
+            output_format: "jpeg",
+          },
+          logs: true,
+          onQueueUpdate: (update) => {
+            console.log("fal.ai queue status:", update.status);
+          },
+        });
+
+
+        console.log("fal.ai result:", JSON.stringify(result.data));
+
+        const output = result.data;
+        const outputImageUrl =
+          (output && output.images && output.images[0] &&
+            output.images[0].url) ||
+          (output && output.image && output.image.url) ||
+          null;
+
+        if (!outputImageUrl) {
+          // ── Refund the count if generation failed ──
+          await usageRef.set(
+              {count: admin.firestore.FieldValue.increment(-1)},
+              {merge: true},
+          );
+          throw new HttpsError(
+              "internal",
+              "No image URL in response: " + JSON.stringify(output),
+          );
+        }
+
+        return {
+          success: true,
+          outputImageUrl,
+          requestId: result.requestId,
+          usageToday: currentCount + 1,
+          remainingToday: DAILY_LIMIT - (currentCount + 1),
+        };
+      } catch (error) {
+        // Refund count if it was a fal.ai generation error
+        if (!(error.code && error.httpErrorCode)) {
+          try {
+            await usageRef.set(
+                {count: admin.firestore.FieldValue.increment(-1)},
+                {merge: true},
+            );
+          } catch (refundErr) {
+            console.error("Failed to refund usage count:", refundErr);
+          }
+        }
+
+        // Log everything we can about the error
+        console.error("virtualHairstyleTryOn full error:", JSON.stringify({
+          message: error.message || "no message",
+          body: error.body || "no body",
+          status: error.status || "no status",
+          cause: error.cause || "no cause",
+          stack: error.stack || "no stack",
+        }));
+
+        // If it's already an HttpsError (auth/limit), rethrow directly
+        if (error.code && error.httpErrorCode) {
+          throw error;
+        }
+
+        // Extract the most useful detail from fal.ai error
+        let detail = "Try-on failed";
+        if (error.body) {
+          if (typeof error.body === "string") {
+            detail = error.body;
+          } else if (error.body.detail) {
+            detail = typeof error.body.detail === "string" ?
+            error.body.detail :
+            JSON.stringify(error.body.detail);
+          } else {
+            detail = JSON.stringify(error.body);
+          }
+        } else if (error.message) {
+          detail = String(error.message);
+        }
+
+        throw new HttpsError("internal", detail);
+      }
+    });
+
+
+exports.updateServiceRating =
+      onDocumentCreated("reviews/{reviewId}", async (event) => {
+        const review = event.data.data();
+        const serviceId = review.serviceId;
+        const rating = review.rating;
+
+        if (!serviceId) {
+          console.warn("Review missing serviceId, skipping update");
+          return null;
+        }
+
+        const serviceRef = admin.firestore().doc(`services/${serviceId}`);
+
+        try {
+          await admin.firestore().runTransaction(async (transaction) => {
+            const serviceDoc = await transaction.get(serviceRef);
+            const data = serviceDoc.data();
+
+            // Initialize fields if they don't exist (for old documents)
+            const currentSum = data.ratingSum ?? 0;
+            const currentCount = data.totalReviews ?? 0;
+
+            // Increment by the new review's rating
+            const newSum = currentSum + rating;
+            const newCount = currentCount + 1;
+            const newAverage = newSum / newCount;
+
+            transaction.update(serviceRef, {
+              ratingSum: newSum,
+              totalReviews: newCount,
+              rating: newAverage,
+              lastReviewUpdate: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            console.log(`Updated service ${serviceId}:
+            new avg=${(data.ratingSum + rating)/(data.totalReviews+1)},
+            count=${data.totalReviews+1}`);
+          });
+          return null;
+        } catch (error) {
+          console.error("Transaction failed for service", serviceId, error);
+          // Optionally throw to trigger a retry (if failurePolicy is enabled)
+          throw error;
+        }
+      });

@@ -46,6 +46,16 @@ class UserCubit extends Cubit<UserState> {
     }
   }
 
+  Future<void> updateUserContact(String phone,  ) async {
+    emit(UserLoading());
+    try{
+      await userRepository.updateUserContact(phone);
+      await loadUser();
+    } catch (e){
+      emit(UserError("Error updating profile: $e"));
+    }
+  }
+
   Future<void> updateUserType(String userType ) async {
     emit(UserLoading());
     try{

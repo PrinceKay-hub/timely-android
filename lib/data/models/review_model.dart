@@ -8,6 +8,7 @@ class Review {
   final double rating;
   final String comment;
   final DateTime createdAt;
+  final String serviceId;
 
   Review({
     required this.id,
@@ -17,6 +18,7 @@ class Review {
     required this.rating,
     required this.comment,
     required this.createdAt,
+    required  this.serviceId
   });
 
   // Convert from Firestore document
@@ -30,6 +32,7 @@ class Review {
       rating: (data['rating'] ?? 0).toDouble(),
       comment: data['comment'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
+      serviceId: data['serviceId'] ?? ''
     );
   }
 
@@ -42,6 +45,7 @@ class Review {
       'rating': rating,
       'comment': comment,
       'createdAt': Timestamp.fromDate(createdAt),
+      'serviceId': serviceId
     };
   }
 }

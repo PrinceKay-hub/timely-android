@@ -38,6 +38,15 @@ class _DetailScreenState extends State<DetailScreen> {
   bool _isLoading = false;
 
   Future<void> _handleDirections(double lat, double lng) async {
+    if (lat == 0.0 || lng == 0.0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location coordinates are not available.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       await NavigationUtils.openDirectionsWithExplicitStart(lat, lng);
@@ -69,7 +78,27 @@ class _DetailScreenState extends State<DetailScreen> {
 
   void shareProviderLink(String serviceId) {
     final deepLink = 'https://timelygh.com/service/$serviceId';
-    SharePlus.instance.share(ShareParams(text: 'Check out my services on Timely: $deepLink'));
+    SharePlus.instance.share(
+      ShareParams(text: 'Check out my services on Timely: $deepLink'),
+    );
+  }
+
+  String formatDuration(int minutes) {
+    if (minutes >= 60 && minutes % 60 == 0) {
+      return '${minutes ~/ 60} hr';
+    } else if (minutes > 60) {
+      return '${minutes ~/ 60}h ${minutes % 60}m';
+    }
+    return '$minutes mins';
+  }
+
+  String displayPrice(dynamic price) {
+    if (price is num) return '₵$price';
+    final parts = price.toString().split(' - ');
+    if (parts.length == 2) {
+      return '₵${parts[0].trim()} - ₵${parts[1].trim()}';
+    }
+    return '₵$price';
   }
 
   @override
@@ -94,6 +123,8 @@ class _DetailScreenState extends State<DetailScreen> {
           return Icons.check; // default icon for unknown amenities
       }
     }
+
+    final landmark = data['landmark'] != null ? ', ${data['landmark']}' : '';
 
     return DefaultTabController(
       length: 3,
@@ -150,6 +181,10 @@ class _DetailScreenState extends State<DetailScreen> {
                                 width: double.infinity,
                                 height: 400,
                                 fit: BoxFit.cover,
+                                memCacheHeight: 800,
+                                fadeInDuration: const Duration(
+                                  milliseconds: 200,
+                                ),
                                 placeholder: (context, url) =>
                                     Shimmer.fromColors(
                                       baseColor: Theme.of(
@@ -166,8 +201,12 @@ class _DetailScreenState extends State<DetailScreen> {
                                         ),
                                       ),
                                     ),
-                                errorWidget: (context, url, error) =>
-                                    const Icon(Icons.error),
+                                errorWidget: (context, url, error) => Container(
+                                  width: double.infinity,
+                                  height: 400,
+                                  color: Colors.grey[300],
+                                  child: const Icon(Icons.error),
+                                ),
                               ),
                             );
                           },
@@ -206,7 +245,9 @@ class _DetailScreenState extends State<DetailScreen> {
                             child: IconButton(
                               icon: Icon(
                                 isFav ? Icons.favorite : Icons.favorite_border,
-                                color: isFav ? Colors.red : null,
+                                color: isFav
+                                    ? Colors.red
+                                    : Theme.of(context).primaryColor,
                                 size: 24,
                               ),
                               onPressed: () {
@@ -249,14 +290,17 @@ class _DetailScreenState extends State<DetailScreen> {
                           );
                         },
                       ),
-                     Container(
+                    Container(
                       margin: const EdgeInsets.all(8),
                       decoration: const BoxDecoration(
                         color: Colors.white,
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.share, color: Color(0xFF8B5CF6)),
+                        icon: Icon(
+                          Icons.share,
+                          color: Theme.of(context).primaryColor,
+                        ),
                         onPressed: () {
                           shareProviderLink(data['id']);
                         },
@@ -350,10 +394,10 @@ class _DetailScreenState extends State<DetailScreen> {
                                   SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      data['location'],
+                                      '${data['district']}$landmark',
                                       style: TextStyle(
                                         color: Colors.grey,
-                                        fontSize: 14,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ),
@@ -620,7 +664,6 @@ class _DetailScreenState extends State<DetailScreen> {
                   pinned: true, // This keeps it at the top when scrolling
                   delegate: _StickyTabBarDelegate(
                     TabBar(
-                      labelColor: Colors.black,
                       unselectedLabelColor: Colors.grey,
                       indicatorColor: Colors.black,
                       tabs: [
@@ -636,12 +679,22 @@ class _DetailScreenState extends State<DetailScreen> {
                 SliverFillRemaining(
                   child: TabBarView(
                     children: [
-                      _buildAboutTab(data),
-                      _buildReviewsTab(data),
-                      _buildPortfolioTab(),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom:  15.0),
+                        child: _buildAboutTab(data),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom:  15.0),
+                        child: _buildReviewsTab(data),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom:  15.0),
+                        child: _buildPortfolioTab(),
+                      ),
                     ],
                   ),
                 ),
+
               ],
             ),
             if (_isLoading)
@@ -745,8 +798,8 @@ class _DetailScreenState extends State<DetailScreen> {
               final service = data['services'][index];
               return _buildServiceItem(
                 service['name'],
-                service['price'].toString(),
-                service['duration'].toString(),
+                displayPrice(service['price']),
+                formatDuration(service['duration']),
               );
             },
           ),
@@ -802,20 +855,17 @@ class _DetailScreenState extends State<DetailScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.reviews_outlined, color: Colors.grey, size: 30,),
-                  SizedBox(height: 10,),
-                  Text('No Reviews Yet', 
-                  style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold
+                  Icon(Icons.reviews_outlined, color: Colors.grey, size: 30),
+                  SizedBox(height: 10),
+                  Text(
+                    'No Reviews Yet',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
-                SizedBox(height: 5,),
-                Text('Engage with service to write review.', 
-                  style: TextStyle(
-                    color: Colors.grey, 
-                    fontSize: 14,
+                  SizedBox(height: 5),
+                  Text(
+                    'Engage with service to write review.',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
-                  )
                 ],
               ),
             );
@@ -1028,34 +1078,30 @@ class _DetailScreenState extends State<DetailScreen> {
     return BlocBuilder<PortfolioCubit, PortfolioState>(
       builder: (context, state) {
         if (state is PortfolioLoading) {
-          return Center(child: CircularProgressIndicator(strokeWidth: 2));
+          return const Center(child: CircularProgressIndicator(strokeWidth: 2));
         } else if (state is PortfolioLoaded) {
           final port = state.images;
 
-            if (port.isEmpty) {
-              
-              return Center(
+          if (port.isEmpty) {
+            return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.image_outlined, color: Colors.grey, size: 30,),
-                  SizedBox(height: 10,),
-                  Text('No Portfolio Yet', 
-                  style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold
+                  Icon(Icons.image_outlined, color: Colors.grey, size: 30),
+                  SizedBox(height: 10),
+                  Text(
+                    'No Portfolio Yet',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
-                SizedBox(height: 5,),
-                Text("This service hasn't added any portfolio images.", 
-                  style: TextStyle(
-                    color: Colors.grey, 
-                    fontSize: 14,
+                  SizedBox(height: 5),
+                  Text(
+                    "This service hasn't added any portfolio images.",
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
                   ),
-                  )
                 ],
               ),
             );
-            }
+          }
 
           return GridView.builder(
             padding: const EdgeInsets.all(20),
@@ -1080,20 +1126,27 @@ class _DetailScreenState extends State<DetailScreen> {
                     ),
                   );
                 },
-                child: _buildPortfolioItem(newList),
+                child: _buildPortfolioItem(context, newList),
               );
             },
           );
         } else if (state is PortfolioError) {
           return Center(child: Text(state.message));
         }
-        return SizedBox.shrink();
+        return const SizedBox.shrink();
       },
     );
   }
 
-  Widget _buildPortfolioItem(PortfolioImage image) {
+  Widget _buildPortfolioItem(BuildContext context, PortfolioImage image) {
     final likes = image.likes!.isEmpty ? 0 : image.likes!.length.toString();
+
+    // Grid is 2 columns with 20px padding on each side and 12px between
+    // columns, so each cell is roughly (screenWidth - 40 - 12) / 2 wide.
+    final mq = MediaQuery.of(context);
+    final cellWidth = (mq.size.width - 52) / 2;
+    final cacheWidth = (cellWidth * mq.devicePixelRatio * 1.5).round();
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(15),
@@ -1110,7 +1163,17 @@ class _DetailScreenState extends State<DetailScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            CachedNetworkImage(imageUrl: image.imageUrl, fit: BoxFit.cover),
+            CachedNetworkImage(
+              imageUrl: image.imageUrl,
+              fit: BoxFit.cover,
+              memCacheWidth: cacheWidth,
+              fadeInDuration: const Duration(milliseconds: 200),
+              placeholder: (context, url) => Container(color: Colors.grey[300]),
+              errorWidget: (context, url, error) => Container(
+                color: Colors.grey[300],
+                child: const Icon(Icons.error, color: Colors.grey),
+              ),
+            ),
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -1120,28 +1183,6 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
               ),
             ),
-            /* Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  category,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),*/
             Positioned(
               bottom: 8,
               left: 8,
@@ -1151,7 +1192,7 @@ class _DetailScreenState extends State<DetailScreen> {
                 children: [
                   Text(
                     image.caption,
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
@@ -1160,12 +1201,14 @@ class _DetailScreenState extends State<DetailScreen> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.favorite, color: Colors.white, size: 12),
-                      SizedBox(width: 4),
-
+                      const Icon(Icons.favorite, color: Colors.white, size: 12),
+                      const SizedBox(width: 4),
                       Text(
                         likes.toString(),
-                        style: TextStyle(color: Colors.white, fontSize: 11),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                        ),
                       ),
                     ],
                   ),
@@ -1177,106 +1220,6 @@ class _DetailScreenState extends State<DetailScreen> {
       ),
     );
   }
-
-  /* void _showPortfolioDetail(int index) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                  child: Image.network(
-                    'https://firebasestorage.googleapis.com/v0/b/booking-cd20f.firebasestorage.app/o/service_images%2F89B8UaIUNCgbK3eqdMAvbRjDJvx2%2F1774627334379.jpg?alt=media&token=c3d87116-0c4b-47d6-8deb-ed16767e7ab2',
-                    width: double.infinity,
-                    height: 300,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.close, size: 20),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-           /* Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Modern Fade Style',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'By Marcus Johnson',
-                    style: TextStyle(
-                      color: Color(0xFF8B5CF6),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'A clean modern fade with textured top. Perfect for professional and casual settings.',
-                    style: TextStyle(color: Colors.grey, height: 1.5),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEDE9FE),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'Haircut',
-                          style: TextStyle(
-                            color: Color(0xFF8B5CF6),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      const Icon(Icons.favorite, color: Colors.red, size: 20),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '124',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),*/
-          ],
-        ),
-      ),
-    );
-  }*/
 
   Widget _buildServiceItem(String name, String price, String duration) {
     return Container(
@@ -1310,14 +1253,14 @@ class _DetailScreenState extends State<DetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '$duration mins',
+                  '$duration',
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
               ],
             ),
           ),
           Text(
-            '₵$price',
+            '$price',
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 16,
@@ -1421,7 +1364,10 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(color: Colors.white, child: tabBar);
+    return Container(
+      color: Theme.of(context).colorScheme.surface,
+      child: tabBar,
+    );
   }
 
   @override

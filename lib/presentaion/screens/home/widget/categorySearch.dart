@@ -1,8 +1,10 @@
 import 'package:booking/presentaion/common/widgets/empty_screens.dart';
 import 'package:booking/presentaion/screens/home/detail_screen.dart';
 import 'package:booking/presentaion/screens/search/cubit/search_cubit.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shimmer/shimmer.dart';
 
 class Categorysearch extends StatefulWidget {
   final String category;
@@ -509,6 +511,8 @@ class _CategorysearchState extends State<Categorysearch> {
   }
 
   Widget _buildResultCard(Map<String, dynamic> item) {
+     var land = item['landmark'];
+     var landmark = land != null ? ', $land' : '';
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -537,29 +541,33 @@ class _CategorysearchState extends State<Categorysearch> {
             // Image & Quick Actions
             Stack(
               children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(15),
-                    topRight: Radius.circular(15),
-                  ),
-                  child: Image.network(
-                    item['images'][0],
+                CachedNetworkImage(
+                imageUrl:
+                    (item['images'] is List &&
+                        (item['images'] as List).isNotEmpty)
+                    ? item['images'][0] as String
+                    : '',
+                height: 160,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                memCacheWidth: 400,
+                fadeInDuration: const Duration(milliseconds: 200),
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: Theme.of(context).colorScheme.surfaceBright,
+                  highlightColor: Theme.of(context).colorScheme.surfaceDim,
+                  child: Container(
                     height: 160,
                     width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        height: 160,
-                        color: Colors.grey[200],
-                        child: Icon(
-                          Icons.image_not_supported,
-                          size: 50,
-                          color: Colors.grey[400],
-                        ),
-                      );
-                    },
+                    color: Colors.white,
                   ),
                 ),
+                errorWidget: (_, __, ___) => Container(
+                  height: 160,
+                  width: double.infinity,
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.error),
+                ),
+              ),
                 // Favorite Button
                 Positioned(
                   top: 12,
@@ -669,7 +677,7 @@ class _CategorysearchState extends State<Categorysearch> {
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          item['location'] ?? 'Unknown location',
+                          '${item['district']}$landmark',
                           style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 13,

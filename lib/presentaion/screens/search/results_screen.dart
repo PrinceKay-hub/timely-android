@@ -1,8 +1,10 @@
 import 'package:booking/presentaion/common/widgets/empty_screens.dart';
 import 'package:booking/presentaion/screens/home/detail_screen.dart';
 import 'package:booking/presentaion/screens/search/cubit/search_cubit.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shimmer/shimmer.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   final String query;
@@ -12,7 +14,7 @@ class SearchResultsScreen extends StatefulWidget {
   const SearchResultsScreen({
     super.key,
     required this.query,
-    required this.location, 
+    required this.location,
     required this.user,
   });
 
@@ -25,7 +27,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   String _sortBy = 'Recommended';
   String _selectedFilter = 'All';
   bool _showFilters = false;
-  
+
   // Store the original data
   List<Map<String, dynamic>> _originalData = [];
   List<Map<String, dynamic>> _filteredData = [];
@@ -40,12 +42,12 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   void fetch() {
     List<String> parts = widget.location.split(' - ');
-      if (parts.length == 2) {
-        region = parts[0];   // "Ashanti"
-        district = parts[1]; // "Kumasi Metropolitan"
-      } else {
-        region = widget.location;
-      }
+    if (parts.length == 2) {
+      region = parts[0]; // "Ashanti"
+      district = parts[1]; // "Kumasi Metropolitan"
+    } else {
+      region = widget.location;
+    }
 
     search.fetchSerchData(widget.query, region, district);
   }
@@ -70,7 +72,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
     // Apply selected filter
     switch (_selectedFilter) {
-
       case 'Highly Rated (4.5+)':
         filtered = filtered.where((item) {
           final rating = item['rating'] ?? 0.0;
@@ -84,7 +85,9 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           if (item['createdAt'] != null) {
             final createdAt = item['createdAt'] as DateTime?;
             if (createdAt != null) {
-              final daysDifference = DateTime.now().difference(createdAt).inDays;
+              final daysDifference = DateTime.now()
+                  .difference(createdAt)
+                  .inDays;
               return daysDifference <= 30; // New = within 30 days
             }
           }
@@ -170,22 +173,23 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     const distanceWeight = 0.2;
 
     // Normalize reviews (log scale to prevent very high review counts from dominating)
-    final normalizedReviews = reviews > 0 ? (reviews / 100).clamp(0.0, 1.0) : 0.0;
+    final normalizedReviews = reviews > 0
+        ? (reviews / 100).clamp(0.0, 1.0)
+        : 0.0;
 
     // Normalize distance (inverse - closer is better)
     final normalizedDistance = distance > 0 ? (1 / (1 + distance / 10)) : 1.0;
 
     // Calculate weighted score
-    final score = (rating / 5.0) * ratingWeight +
+    final score =
+        (rating / 5.0) * ratingWeight +
         normalizedReviews * reviewsWeight +
         normalizedDistance * distanceWeight;
 
     return score;
   }
 
-
   String _formatDistance(double distanceInKm) {
-
     if (distanceInKm < 1) {
       return '${(distanceInKm * 1000).round()} m';
     } else if (distanceInKm < 10) {
@@ -208,9 +212,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           }
 
           if (state is SearchError) {
-            return Scaffold(
-              body: Center(child: Text(state.message)),
-            );
+            return Scaffold(body: Center(child: Text(state.message)));
           }
 
           if (state is SearchLoaded) {
@@ -246,9 +248,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 
   Widget _buildHeader(int resultCount) {
-   final districts = district.isNotEmpty
-    ? '- $district'
-    : '';
+    final districts = district.isNotEmpty ? '- $district' : '';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -306,10 +306,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           ),
           const SizedBox(height: 16),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 8,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               borderRadius: BorderRadius.circular(20),
@@ -498,10 +495,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     const SizedBox(height: 8),
                     const Text(
                       'Try adjusting your filters or search criteria',
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                      ),
+                      style: TextStyle(color: Colors.grey, fontSize: 14),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 24),
@@ -564,15 +558,14 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
   }
 
   Widget _buildResultCard(Map<String, dynamic> item) {
+    var land = item['landmark'];
+    var landmark = land != null ? ', $land' : '';
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => DetailScreen(
-              data: item,
-              user: widget.user,
-            ),
+            builder: (context) => DetailScreen(data: item, user: widget.user),
           ),
         );
       },
@@ -599,22 +592,32 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     topLeft: Radius.circular(15),
                     topRight: Radius.circular(15),
                   ),
-                  child: Image.network(
-                    item['images'][0],
+                  child: CachedNetworkImage(
+                    imageUrl:
+                        (item['images'] is List &&
+                            (item['images'] as List).isNotEmpty)
+                        ? item['images'][0] as String
+                        : '',
                     height: 160,
                     width: double.infinity,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
+                    memCacheWidth: 400,
+                    fadeInDuration: const Duration(milliseconds: 200),
+                    placeholder: (context, url) => Shimmer.fromColors(
+                      baseColor: Theme.of(context).colorScheme.surfaceBright,
+                      highlightColor: Theme.of(context).colorScheme.surfaceDim,
+                      child: Container(
                         height: 160,
-                        color: Colors.grey[200],
-                        child: Icon(
-                          Icons.image_not_supported,
-                          size: 50,
-                          color: Colors.grey[400],
-                        ),
-                      );
-                    },
+                        width: double.infinity,
+                        color: Colors.white,
+                      ),
+                    ),
+                    errorWidget: (_, __, ___) => Container(
+                      height: 160,
+                      width: double.infinity,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.error),
+                    ),
                   ),
                 ),
                 // Favorite Button
@@ -636,7 +639,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 ),
               ],
             ),
-      
+
             // Content
             Padding(
               padding: const EdgeInsets.all(16),
@@ -671,7 +674,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-      
+
                   // Rating & Reviews
                   Row(
                     children: [
@@ -687,33 +690,50 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                       const SizedBox(width: 4),
                       Text(
                         '(${item['reviews'] ?? 0} reviews)',
-                        style: const TextStyle(color: Colors.grey, fontSize: 13),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 13,
+                        ),
                       ),
                       const Spacer(),
-                      Icon(Icons.location_on, color: Colors.grey[400], size: 16),
-                      const SizedBox(width: 4),
-                      
-                      if(item['distance'] == null)
-                      Text('N/A')
-                      else
-                      Text(
-                        _formatDistance(item['distance'].toDouble()),
-                        //item['distanceText']?.toString() ?? 'N/A',
-                        style: const TextStyle(color: Colors.grey, fontSize: 13),
+                      Icon(
+                        Icons.location_on,
+                        color: Colors.grey[400],
+                        size: 16,
                       ),
+                      const SizedBox(width: 4),
+
+                      if (item['distance'] == null)
+                        Text('N/A')
+                      else
+                        Text(
+                          _formatDistance(item['distance'].toDouble()),
+                          //item['distanceText']?.toString() ?? 'N/A',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 13,
+                          ),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 8),
-      
+
                   // Address
                   Row(
                     children: [
-                      Icon(Icons.location_city, color: Colors.grey[400], size: 16),
+                      Icon(
+                        Icons.location_city,
+                        color: Colors.grey[400],
+                        size: 16,
+                      ),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          item['location'] ?? 'Unknown location',
-                          style: const TextStyle(color: Colors.grey, fontSize: 13),
+                          '${item['district']}$landmark',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 13,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -721,38 +741,37 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-      
+
                   // Services Tags
                   if (item['services'] != null && item['services'] is List)
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
-                      children: (item['services'] as List<dynamic>)
-                          .take(3)
-                          .map((service) {
-                            final name = service is Map
-                                ? (service['name'] as String? ?? '')
-                                : service.toString();
-                            return Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
+                      children: (item['services'] as List<dynamic>).take(3).map(
+                        (service) {
+                          final name = service is Map
+                              ? (service['name'] as String? ?? '')
+                              : service.toString();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEDE9FE),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              name,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.primary,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
                               ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEDE9FE),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                name,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.primary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            );
-                          })
-                          .toList(),
+                            ),
+                          );
+                        },
+                      ).toList(),
                     ),
                 ],
               ),

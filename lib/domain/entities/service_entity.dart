@@ -1,4 +1,3 @@
-
 import 'package:equatable/equatable.dart';
 import 'package:flutter/material.dart';
 
@@ -37,6 +36,15 @@ class WorkingHours extends Equatable {
 
   @override
   List<Object> get props => [startHour, endHour, startMinute, endMinute];
+
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      'startHour': startHour,
+      'endHour': endHour,
+      'startMinute': startMinute,
+      'endMinute': endMinute,
+    };
+  }
 }
 
 
@@ -64,6 +72,7 @@ class ServiceEntity extends Equatable {
   final String number;
   final String region;
   final String district;
+  final String landmark;
 
   const ServiceEntity({
     required this.id,
@@ -87,7 +96,8 @@ class ServiceEntity extends Equatable {
     required this.amenities,
     required this.number,
     required this.region,
-    required this.district
+    required this.district,
+    required this.landmark
   });
 
   ServiceEntity copyWith({
@@ -101,7 +111,6 @@ class ServiceEntity extends Equatable {
     double? longitude,
     List<String>? workingDays,
     WorkingHours? workingHours,
-    double? price,
     int? durationMinutes,
     List<String>? images,
     double? rating,
@@ -114,6 +123,7 @@ class ServiceEntity extends Equatable {
     String? number,
     String? region,
     String? district,
+    String? landmark
   }) {
     return ServiceEntity(
       id: id ?? this.id,
@@ -138,6 +148,7 @@ class ServiceEntity extends Equatable {
       number: number ?? this.number,
       region: region ?? this.region,
       district: district ?? this.district,
+      landmark: landmark ?? this.landmark,
     );
   }
 
@@ -165,5 +176,6 @@ class ServiceEntity extends Equatable {
         number,
         region,
         district,
+        landmark
       ];
 }

@@ -31,7 +31,7 @@ class ServiceDataCubit extends Cubit<ServiceDataState> {
    try { 
    
     // Simulate data fetching with a delay 
-    await serviceRepository.updateService(serviceId, service); 
+    //await serviceRepository.updateService(serviceId, service); 
 
     emit(ServiceDataUpdateSuccess()); 
   } catch (e) { 

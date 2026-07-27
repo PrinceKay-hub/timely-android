@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:booking/data/models/portfolio_model.dart';
 import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_bloc.dart';
 import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_state.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -64,8 +65,6 @@ class _PortfolioPageState extends State<PortfolioPage>
 
     // Small delay to let animation finish
     await Future.delayed(Duration(milliseconds: 200));
-
-    print('_pickImage called with source: $source');
 
     final XFile? pickedFile = await _picker.pickImage(
       source: source,
@@ -131,6 +130,10 @@ class _PortfolioPageState extends State<PortfolioPage>
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
+                  // Already picked at maxWidth/maxHeight 1024, but still
+                  // downsample the decode to the preview box size.
+                  cacheHeight:
+                      (200 * MediaQuery.of(ctx).devicePixelRatio).round(),
                 ),
               ),
               SizedBox(height: 20),
@@ -277,7 +280,7 @@ class _PortfolioPageState extends State<PortfolioPage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: GestureDetector(
         onTap: () {
           // Close FAB options when tapping outside
@@ -503,8 +506,8 @@ class _PortfolioPageState extends State<PortfolioPage>
 
       // Floating Action Button with options
       floatingActionButton: SizedBox(
-        width: 200, 
-        height: 200, 
+        width: 200,
+        height: 200,
         child: Stack(
           clipBehavior: Clip.none,
           children: [
@@ -587,7 +590,7 @@ class _PortfolioPageState extends State<PortfolioPage>
             ),
           ),
         ),
-         SizedBox(width: 12),
+        SizedBox(width: 12),
         FloatingActionButton.small(
           heroTag: label,
           onPressed: onPressed,
@@ -620,97 +623,100 @@ class _PortfolioPageState extends State<PortfolioPage>
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Image
-                Image.network(
-                  image.imageUrl,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: Colors.grey[200],
-                      child: Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                              : null,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                // Size the decoded bitmap to the actual grid cell (2
+                // columns, so roughly half the available width) instead
+                // of decoding the source photo at full resolution.
+                final cacheWidth = (constraints.maxWidth *
+                        MediaQuery.of(context).devicePixelRatio)
+                    .round();
+
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Image
+                    CachedNetworkImage(
+                      imageUrl: image.imageUrl,
+                      fit: BoxFit.cover,
+                      memCacheWidth: cacheWidth,
+                      fadeInDuration: const Duration(milliseconds: 200),
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[200],
+                        child: const Center(
+                          child: CircularProgressIndicator(),
                         ),
                       ),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[300],
-                      child: Icon(
-                        Icons.broken_image,
-                        size: 48,
-                        color: Colors.grey,
-                      ),
-                    );
-                  },
-                ),
-
-                // Gradient overlay
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.7),
-                        ],
+                      errorWidget: (context, url, error) => Container(
+                        color: Colors.grey[300],
+                        child: const Icon(
+                          Icons.broken_image,
+                          size: 48,
+                          color: Colors.grey,
+                        ),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (image.caption.isNotEmpty)
-                          Text(
-                            image.caption,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
+
+                    // Gradient overlay
+                    Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Container(
+                        padding: EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withOpacity(0.7),
+                            ],
                           ),
-                      ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (image.caption.isNotEmpty)
+                              Text(
+                                image.caption,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
 
-                // Delete button
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => _deleteImage(image),
-                    child: Container(
-                      padding: EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.delete_outline,
-                        color: Colors.white,
-                        size: 20,
+                    // Delete button
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () => _deleteImage(image),
+                        child: Container(
+                          padding: EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.delete_outline,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
           ),
         ),
@@ -769,13 +775,34 @@ class _PortfolioViewerScreenState extends State<_PortfolioViewerScreen> {
             itemCount: widget.images.length,
             itemBuilder: (context, index) {
               final image = widget.images[index];
+              // Headroom for the 4x pinch-zoom below, sized to the
+              // viewport rather than decoding the full source resolution
+              // on every swipe.
+              final mq = MediaQuery.of(context);
+              final cacheWidth = (mq.size.width * mq.devicePixelRatio * 2)
+                  .round();
+
               return Hero(
                 tag: 'portfolio_${image.id}',
                 child: InteractiveViewer(
                   minScale: 1.0,
                   maxScale: 4.0,
                   child: Center(
-                    child: Image.network(image.imageUrl, fit: BoxFit.contain),
+                    child: CachedNetworkImage(
+                      imageUrl: image.imageUrl,
+                      fit: BoxFit.contain,
+                      memCacheWidth: cacheWidth,
+                      progressIndicatorBuilder: (context, url, progress) =>
+                          Center(
+                        child: CircularProgressIndicator(
+                          value: progress.progress,
+                          color: Colors.white,
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => const Center(
+                        child: Icon(Icons.broken_image, color: Colors.white),
+                      ),
+                    ),
                   ),
                 ),
               );
