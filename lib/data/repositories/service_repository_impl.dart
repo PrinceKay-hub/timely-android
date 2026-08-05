@@ -3,6 +3,7 @@ import 'package:booking/domain/repositories/service_repository.dart';
 import 'package:booking/data/models/service_model.dart';
 import 'package:booking/core/network/firebase_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
 class ServiceRepositoryImpl extends ServiceRepository {
@@ -16,7 +17,7 @@ class ServiceRepositoryImpl extends ServiceRepository {
     : firebaseService = firebaseService ?? FirebaseService();
 
   @override
-  Future<String> createService(ServiceEntity service) async {
+  Future<String> createService(ServiceEntity service, bool isProvider) async {
     try {
       final serviceData = ServiceModel.fromEntity(service).toJson();
 
@@ -30,6 +31,18 @@ class ServiceRepositoryImpl extends ServiceRepository {
         'id': docRef.id,
       });
 
+      // Log provider signup/onboarding conversion
+      if (isProvider != true) {
+        await FirebaseAnalytics.instance.logEvent(
+          name: 'provider_signup_complete',
+          parameters: {
+            'provider_id': service.providerId,
+            'service_id': docRef.id,
+            'method': 'app',
+          },
+        );
+      }
+
       return docRef.id;
     } catch (e) {
       throw Exception('Failed to create service: $e');
@@ -37,10 +50,7 @@ class ServiceRepositoryImpl extends ServiceRepository {
   }
 
   @override
-  Future<void> updateService(
-    String serviceId,
-    ServiceEntity service,
-  ) async {
+  Future<void> updateService(String serviceId, ServiceEntity service) async {
     try {
       final serviceData = ServiceModel.fromEntity(service).toJson();
 
@@ -110,23 +120,24 @@ class ServiceRepositoryImpl extends ServiceRepository {
   }
 
   @override
-  Future<List<Map<String, dynamic>>> getServicesByProvider(String providerId) async {
-  try {
-    final querySnapshot = await _firestore
-        .collection('services')
-        .where('providerId', isEqualTo: providerId)
-        .get(); // no limit
+  Future<List<Map<String, dynamic>>> getServicesByProvider(
+    String providerId,
+  ) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('services')
+          .where('providerId', isEqualTo: providerId)
+          .get(); // no limit
 
-    return querySnapshot.docs.map((doc) {
-      final data = doc.data();
-      data['id'] = doc.id;
-      return data;
-    }).toList();
-  } catch (e) {
-    throw Exception('Failed to get provider services: $e');
+      return querySnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+    } catch (e) {
+      throw Exception('Failed to get provider services: $e');
+    }
   }
-}
-
 
   @override
   Future<List> getAllServices() async {

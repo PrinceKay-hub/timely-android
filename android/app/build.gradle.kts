@@ -39,8 +39,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 17
-        versionName = "3.2.5"
+        versionCode = 20
+        versionName = "3.6.1"
     }
 
     signingConfigs {
@@ -67,6 +67,7 @@ flutter {
 }
 
 dependencies {
-    // ... other dependencies
+    implementation(platform("com.google.firebase:firebase-bom:34.16.0"))
+    implementation("com.google.firebase:firebase-analytics")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

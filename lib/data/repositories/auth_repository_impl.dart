@@ -44,6 +44,7 @@ class AuthRepositoryImpl extends AuthRepository {
           userType: UserType.client,
           createdAt: DateTime.now(),
           isEmailVerified: userCredential.user!.emailVerified,
+          isProvider: false,
         );
 
         await _firebaseService.addUserData(newUser.toJson());
@@ -83,7 +84,7 @@ class AuthRepositoryImpl extends AuthRepository {
         createdAt: DateTime.now(),
         isEmailVerified: false,
         displayName: displayName,
-        service: '',
+        isProvider: false,
       );
 
       await _firebaseService.addUserData(newUser.toJson());
@@ -127,7 +128,7 @@ class AuthRepositoryImpl extends AuthRepository {
           userType: UserType.client,
           createdAt: DateTime.now(),
           isEmailVerified: true,
-          service: '',
+          isProvider: false,
         );
 
 
@@ -222,7 +223,7 @@ class AuthRepositoryImpl extends AuthRepository {
         email: user.email ?? '',
         displayName: user.displayName,
         photoUrl: user.photoURL,
-        userType: UserType.client, // Default, should fetch from Firestore
+        userType: UserType.client,
         isEmailVerified: user.emailVerified,
       ).toEntity();
     } catch (e) {

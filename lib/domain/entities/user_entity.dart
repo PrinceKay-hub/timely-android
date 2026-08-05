@@ -11,8 +11,7 @@ class UserEntity extends Equatable {
   final DateTime? createdAt;
   final bool isEmailVerified;
   final Map<String, dynamic>? providerProfile;
-  final bool hasService;
-  final String? service;
+  final bool isProvider;
 
   const UserEntity({
     required this.id,
@@ -23,8 +22,7 @@ class UserEntity extends Equatable {
     this.createdAt,
     this.isEmailVerified = false,
     this.providerProfile,
-    this.hasService = false,
-    this.service,
+    this.isProvider = false,
   });
 
   @override
@@ -37,7 +35,6 @@ class UserEntity extends Equatable {
         createdAt,
         isEmailVerified,
         providerProfile,
-        hasService,
-        service
+        isProvider
       ];
 }

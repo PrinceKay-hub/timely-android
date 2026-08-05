@@ -1,6 +1,7 @@
 import 'package:booking/core/utils/navigation_utils.dart';
 import 'package:booking/data/models/portfolio_model.dart';
 import 'package:booking/presentaion/booking/booking.dart';
+import 'package:booking/presentaion/chat/cubit_chat/chat_cubit.dart';
 import 'package:booking/presentaion/common/pages/gallery_widget.dart';
 import 'package:booking/presentaion/common/widgets/working_hours_display.dart';
 import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_bloc.dart';
@@ -13,6 +14,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
@@ -36,6 +38,7 @@ class _DetailScreenState extends State<DetailScreen> {
   bool isFavorite = false;
   int currentIndex = 0;
   bool _isLoading = false;
+  bool _isMessageLoading = false;
 
   Future<void> _handleDirections(double lat, double lng) async {
     if (lat == 0.0 || lng == 0.0) {
@@ -61,20 +64,6 @@ class _DetailScreenState extends State<DetailScreen> {
     }
   }
 
-  Future<void> launchWhatsApp({required String phone, String? message}) async {
-    // Encode the message if provided
-    final text = message != null ? '&text=${Uri.encodeComponent(message)}' : '';
-    final url = 'whatsapp://send?phone=$phone$text';
-
-    final Uri whatsappUri = Uri.parse(url);
-
-    if (await canLaunchUrl(whatsappUri)) {
-      await launchUrl(whatsappUri);
-    } else {
-      // WhatsApp is not installed
-      throw 'Could not launch WhatsApp. Make sure it is installed.';
-    }
-  }
 
   void shareProviderLink(String serviceId) {
     final deepLink = 'https://timelygh.com/service/$serviceId';
@@ -100,6 +89,62 @@ class _DetailScreenState extends State<DetailScreen> {
     }
     return '₵$price';
   }
+
+  Future<void> _handleMessage() async {
+  // Guard: provider must exist
+  final providerId = data['providerId'] as String?;
+  if (providerId == null || providerId.isEmpty) {
+    _showSnackbar('Provider not available', isError: true);
+    return;
+  }
+
+  // Guard: user must be logged in
+  final currentUserId = user['id'] as String?;
+  if (currentUserId == null || currentUserId.isEmpty) {
+    _showSnackbar('Please sign in to message this provider.', isError: true);
+    return;
+  }
+
+  setState(() => _isMessageLoading = true);
+
+  try {
+    // Get or create chat via ChatCubit
+    final chatCubit = context.read<ChatCubit>();
+    final chatId = await chatCubit.getOrCreateChat(
+      currentUserId: currentUserId,
+      currentUserName: user['displayName'] ?? user['name'] ?? 'User',
+      currentUserPhoto: user['photoURL'] ?? '',
+      otherUserId: providerId,
+      otherUserName: data['name'] ?? 'Provider',
+      otherUserPhoto: data['providerPhoto'] ?? (data['images']?.isNotEmpty == true ? data['images'][0] : null),
+      serviceId: data['id'],
+      serviceName: data['name'],
+      providerId: providerId,
+    );
+
+    // Navigate to the chat room (using go_router)
+    if (mounted) {
+      context.push('/chat/$chatId');
+    }
+  } catch (e) {
+    if (mounted) {
+      _showSnackbar('Could not open chat. Please try again.', isError: true);
+    }
+  } finally {
+    if (mounted) setState(() => _isMessageLoading = false);
+  }
+}
+
+void _showSnackbar(String message, {bool isError = false}) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: isError ? Colors.red : Colors.green,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -556,61 +601,9 @@ class _DetailScreenState extends State<DetailScreen> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: _buildQuickAction(
-                                  FontAwesomeIcons.whatsapp,
-                                  'WhatsApp',
-                                  () async {
-                                    if (data['number'] == null) {
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          backgroundColor: Colors.red,
-                                          showCloseIcon: true,
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadiusGeometry.circular(
-                                                  10,
-                                                ),
-                                          ),
-                                          content: const Text(
-                                            'WhatsApp number not available',
-                                          ),
-                                        ),
-                                      );
-                                      return;
-                                    }
-                                    ;
-                                    var contact = data['number'];
-                                    var text = 'Hello!';
-                                    String trimmedNumber = contact.substring(1);
-
-                                    try {
-                                      await launchWhatsApp(
-                                        phone: trimmedNumber,
-                                        message: text,
-                                      );
-                                    } catch (e) {
-                                      // Show a snackbar or dialog
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            'WhatsApp not installed',
-                                          ),
-                                          backgroundColor: Colors.red,
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadiusGeometry.circular(
-                                                  10,
-                                                ),
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  },
+                                  FontAwesomeIcons.message,                    // or FontAwesomeIcons.message
+                                  'Message',
+                                  _handleMessage,
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -679,25 +672,16 @@ class _DetailScreenState extends State<DetailScreen> {
                 SliverFillRemaining(
                   child: TabBarView(
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom:  15.0),
-                        child: _buildAboutTab(data),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom:  15.0),
-                        child: _buildReviewsTab(data),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom:  15.0),
-                        child: _buildPortfolioTab(),
-                      ),
+                      _buildAboutTab(data),
+                      _buildReviewsTab(data),
+                      _buildPortfolioTab(),
                     ],
                   ),
                 ),
 
               ],
             ),
-            if (_isLoading)
+            if (_isLoading || _isMessageLoading)
               Positioned.fill(
                 child: AbsorbPointer(
                   absorbing: true, // blocks all touch events
@@ -836,6 +820,7 @@ class _DetailScreenState extends State<DetailScreen> {
               }).toList(),
             ],
           ),
+          SizedBox(height: 60,)
         ],
       ),
     );
@@ -956,6 +941,8 @@ class _DetailScreenState extends State<DetailScreen> {
                     ),
                   ),
                 ),*/
+
+                SizedBox(height: 60,)
               ],
             ),
           );

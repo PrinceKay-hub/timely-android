@@ -1,4 +1,4 @@
-import 'package:booking/presentaion/common/widgets/empty_screens.dart';
+// lib/presentation/screens/search/search_results_screen.dart
 import 'package:booking/presentaion/screens/home/detail_screen.dart';
 import 'package:booking/presentaion/screens/search/cubit/search_cubit.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -23,172 +23,70 @@ class SearchResultsScreen extends StatefulWidget {
 }
 
 class _SearchResultsScreenState extends State<SearchResultsScreen> {
-  late final search = context.read<SearchCubit>();
-  String _sortBy = 'Recommended';
-  String _selectedFilter = 'All';
+  // --- Local state for UI controls ---
+  String _sortBy = 'distance';         // 'distance' | 'rating' (matches backend)
+  String _selectedFilter = 'All';      // 'All' | 'Verified'
   bool _showFilters = false;
 
-  // Store the original data
-  List<Map<String, dynamic>> _originalData = [];
-  List<Map<String, dynamic>> _filteredData = [];
+  // --- Parsed location parts ---
   String region = '';
   String district = '';
 
+  // --- Scroll controller for infinite scroll ---
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
-    fetch();
     super.initState();
+    _parseLocation();
+    _fetchFirstPage();
+    _scrollController.addListener(_onScroll);
   }
 
-  void fetch() {
-    List<String> parts = widget.location.split(' - ');
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  // --- Helpers ---
+  void _parseLocation() {
+    final parts = widget.location.split(' - ');
     if (parts.length == 2) {
-      region = parts[0]; // "Ashanti"
-      district = parts[1]; // "Kumasi Metropolitan"
+      region = parts[0];
+      district = parts[1];
     } else {
       region = widget.location;
     }
-
-    search.fetchSerchData(widget.query, region, district);
   }
 
-  final List<String> _sortOptions = [
-    'Recommended',
-    'Highest Rated',
-    'Most Reviews',
-    'Nearest',
-  ];
+  void _fetchFirstPage() {
+    final cubit = context.read<SearchCubit>();
+    cubit.fetchSearchResults(
+      query: widget.query,
+      region: region,
+      district: district.isNotEmpty ? district : null,
+      sortBy: _sortBy,      // pass sort to backend
+    );
+  }
 
-  final List<String> _filterOptions = [
-    'All',
-    'Highly Rated (4.5+)',
-    'New Listings',
-    'Verified',
-  ];
-
-  // Apply filters to the data
-  void _applyFilters(List<Map<String, dynamic>> data) {
-    List<Map<String, dynamic>> filtered = List.from(data);
-
-    // Apply selected filter
-    switch (_selectedFilter) {
-      case 'Highly Rated (4.5+)':
-        filtered = filtered.where((item) {
-          final rating = item['rating'] ?? 0.0;
-          return rating >= 4.5;
-        }).toList();
-        break;
-
-      case 'New Listings':
-        filtered = filtered.where((item) {
-          // Assuming you have a createdAt field
-          if (item['createdAt'] != null) {
-            final createdAt = item['createdAt'] as DateTime?;
-            if (createdAt != null) {
-              final daysDifference = DateTime.now()
-                  .difference(createdAt)
-                  .inDays;
-              return daysDifference <= 30; // New = within 30 days
-            }
-          }
-          return false;
-        }).toList();
-        break;
-
-      case 'Verified':
-        filtered = filtered.where((item) {
-          final isVerified = item['isVerified'] ?? false;
-          return isVerified == true;
-        }).toList();
-        break;
-
-      case 'All':
-      default:
-        // No filtering
-        break;
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      final cubit = context.read<SearchCubit>();
+      cubit.loadMoreResults();
     }
-
-    setState(() {
-      _filteredData = filtered;
-    });
-
-    // Apply sort after filtering
-    _applySorting();
   }
 
-  // Apply sorting to the filtered data
-  void _applySorting() {
-    List<Map<String, dynamic>> sorted = List.from(_filteredData);
-
-    switch (_sortBy) {
-      case 'Highest Rated':
-        sorted.sort((a, b) {
-          final ratingA = a['rating'] ?? 0.0;
-          final ratingB = b['rating'] ?? 0.0;
-          return ratingB.compareTo(ratingA); // Descending
-        });
-        break;
-
-      case 'Most Reviews':
-        sorted.sort((a, b) {
-          final reviewsA = a['reviews'] ?? 0;
-          final reviewsB = b['reviews'] ?? 0;
-          return reviewsB.compareTo(reviewsA); // Descending
-        });
-        break;
-
-      case 'Nearest':
-        sorted.sort((a, b) {
-          final distanceA = a['distance'] ?? double.infinity;
-          final distanceB = b['distance'] ?? double.infinity;
-          return distanceA.compareTo(distanceB); // Ascending
-        });
-        break;
-
-      case 'Recommended':
-      default:
-        // Default sorting - combination of rating and distance
-        sorted.sort((a, b) {
-          final scoreA = _calculateRecommendationScore(a);
-          final scoreB = _calculateRecommendationScore(b);
-          return scoreB.compareTo(scoreA); // Descending
-        });
-        break;
+  // --- Client‑side filtering (only on current results) ---
+  List<Map<String, dynamic>> _getFilteredResults(List<Map<String, dynamic>> allResults) {
+    if (_selectedFilter == 'Verified') {
+      return allResults.where((item) => item['isVerified'] == true).toList();
     }
-
-    setState(() {
-      _filteredData = sorted;
-    });
+    return allResults;
   }
 
-  // Calculate recommendation score based on rating, reviews, and distance
-  double _calculateRecommendationScore(Map<String, dynamic> item) {
-    final rating = item['rating'] ?? 0.0;
-    final reviews = item['reviews'] ?? 0;
-    final distance = item['distance'] ?? 100.0;
-
-    // Weight factors
-    const ratingWeight = 0.5;
-    const reviewsWeight = 0.3;
-    const distanceWeight = 0.2;
-
-    // Normalize reviews (log scale to prevent very high review counts from dominating)
-    final normalizedReviews = reviews > 0
-        ? (reviews / 100).clamp(0.0, 1.0)
-        : 0.0;
-
-    // Normalize distance (inverse - closer is better)
-    final normalizedDistance = distance > 0 ? (1 / (1 + distance / 10)) : 1.0;
-
-    // Calculate weighted score
-    final score =
-        (rating / 5.0) * ratingWeight +
-        normalizedReviews * reviewsWeight +
-        normalizedDistance * distanceWeight;
-
-    return score;
-  }
-
+  // --- UI Helpers ---
   String _formatDistance(double distanceInKm) {
     if (distanceInKm < 1) {
       return '${(distanceInKm * 1000).round()} m';
@@ -199,55 +97,68 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     }
   }
 
+  // --- Build methods ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F4F6),
-      body: BlocBuilder<SearchCubit, SearchState>(
+      body: BlocConsumer<SearchCubit, SearchState>(
+        listener: (context, state) {
+          // If error occurs, we can optionally show a snackbar; but we show in body.
+        },
         builder: (context, state) {
-          if (state is SearchLoading) {
+          // --- Initial loading (no results yet) ---
+          if (state.isLoading && state.results.isEmpty) {
             return const Center(
               child: CircularProgressIndicator(strokeWidth: 2),
             );
           }
 
-          if (state is SearchError) {
-            return Scaffold(body: Center(child: Text(state.message)));
-          }
-
-          if (state is SearchLoaded) {
-            final receivedData = state.results;
-            // Initialize data on first load
-            if (_originalData.isEmpty && receivedData.isNotEmpty) {
-              _originalData = List.from(receivedData);
-              _filteredData = List.from(receivedData);
-              // Apply initial sorting
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                _applySorting();
-              });
-            }
-
-            if (receivedData.isEmpty) {
-              return _buildEmptyState();
-            }
-
-            return Column(
-              children: [
-                _buildHeader(_filteredData.length),
-                _buildSortFilterBar(),
-                if (_showFilters) _buildFilterChips(),
-                _buildResultsList(),
-              ],
+          // --- Error state ---
+          if (state.error != null && state.results.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    state.error!,
+                    style: const TextStyle(color: Colors.red),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _fetchFirstPage,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
             );
           }
 
-          return const SizedBox.shrink();
+          // --- Loaded state (with or without results) ---
+          final allResults = state.results;
+          final filteredResults = _getFilteredResults(allResults);
+
+          return Column(
+            children: [
+              _buildHeader(state.totalCount),
+              _buildSortFilterBar(),
+              if (_showFilters) _buildFilterChips(),
+              Expanded(
+                child: filteredResults.isEmpty
+                    ? _buildEmptyState()
+                    : _buildResultsList(filteredResults, state.isLoadingMore),
+              ),
+              SizedBox(height: 20),
+            ],
+          );
         },
       ),
     );
   }
 
-  Widget _buildHeader(int resultCount) {
+  // --- Header ---
+  Widget _buildHeader(int totalCount) {
     final districts = district.isNotEmpty ? '- $district' : '';
     return Container(
       padding: const EdgeInsets.all(20),
@@ -259,6 +170,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 20),
           Row(
@@ -283,7 +195,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      widget.query,
+                      '${widget.query}s',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 20,
@@ -312,7 +224,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              '$resultCount result${resultCount != 1 ? 's' : ''} found',
+              '$totalCount result${totalCount != 1 ? 's' : ''} found',
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.w600,
@@ -324,6 +236,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
+  // --- Sort & Filter Bar ---
   Widget _buildSortFilterBar() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -334,10 +247,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             child: GestureDetector(
               onTap: _showSortOptions,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF3F4F6),
                   borderRadius: BorderRadius.circular(10),
@@ -353,7 +263,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        _sortBy,
+                        _sortBy == 'distance' ? 'Nearest' : 'Highest Rated',
                         style: const TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
@@ -384,27 +294,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
               ),
               child: Icon(
                 Icons.tune,
-                color: _showFilters
-                    ? Colors.white
-                    : Theme.of(context).colorScheme.primary,
-                size: 20,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: () {
-              // Show map view
-            },
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF3F4F6),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.map_outlined,
-                color: Theme.of(context).colorScheme.primary,
+                color: _showFilters ? Colors.white : Theme.of(context).colorScheme.primary,
                 size: 20,
               ),
             ),
@@ -414,6 +304,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
+  // --- Filter Chips ---
   Widget _buildFilterChips() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -421,7 +312,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
-          children: _filterOptions.map((filter) {
+          children: ['All', 'Verified'].map((filter) {
             final isSelected = _selectedFilter == filter;
             return Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -430,21 +321,15 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                   setState(() {
                     _selectedFilter = filter;
                   });
-                  _applyFilters(_originalData);
                 },
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected
                         ? Theme.of(context).colorScheme.primary
                         : const Color(0xFFF3F4F6),
                     borderRadius: BorderRadius.circular(20),
-                    border: isSelected
-                        ? null
-                        : Border.all(color: Colors.grey[300]!),
+                    border: isSelected ? null : Border.all(color: Colors.grey[300]!),
                   ),
                   child: Text(
                     filter,
@@ -463,100 +348,82 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
-  Widget _buildResultsList() {
-    return Expanded(
-      child: _filteredData.isEmpty
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(40),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEDE9FE),
-                        borderRadius: BorderRadius.circular(60),
-                      ),
-                      child: Icon(
-                        Icons.filter_alt_off,
-                        size: 60,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'No results match your filters',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Try adjusting your filters or search criteria',
-                      style: TextStyle(color: Colors.grey, fontSize: 14),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedFilter = 'All';
-                          _sortBy = 'Recommended';
-                        });
-                        _applyFilters(_originalData);
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Clear Filters',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ],
+  // --- Results List with infinite scroll ---
+  Widget _buildResultsList(List<Map<String, dynamic>> items, bool isLoadingMore) {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(20),
+      itemCount: items.length + (isLoadingMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index == items.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+          );
+        }
+        final item = items[index];
+        return _buildResultCard(item);
+      },
+    );
+  }
+
+  // --- Empty State ---
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEDE9FE),
+                borderRadius: BorderRadius.circular(60),
+              ),
+              child: Icon(
+                Icons.filter_alt_off,
+                size: 60,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'No results match your filters',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Try adjusting your filters or search criteria',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _selectedFilter = 'All';
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _filteredData.length,
-              itemBuilder: (context, index) {
-                final Map<String, dynamic> item = _filteredData[index];
-                return _buildResultCard(item);
-              },
+              child: const Text(
+                'Clear Filters',
+                style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+              ),
             ),
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Column(
-      children: [
-        _buildHeader(0),
-        _buildSortFilterBar(),
-        if (_showFilters) _buildFilterChips(),
-        Expanded(
-          child: EmptyScreen(
-            icon: Icons.search_off,
-            title: 'No data found in',
-            text: region,
-          ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
+  // --- Individual Result Card ---
   Widget _buildResultCard(Map<String, dynamic> item) {
     var land = item['landmark'];
     var landmark = land != null ? ', $land' : '';
@@ -593,9 +460,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     topRight: Radius.circular(15),
                   ),
                   child: CachedNetworkImage(
-                    imageUrl:
-                        (item['images'] is List &&
-                            (item['images'] as List).isNotEmpty)
+                    imageUrl: (item['images'] is List && (item['images'] as List).isNotEmpty)
                         ? item['images'][0] as String
                         : '',
                     height: 160,
@@ -639,7 +504,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 ),
               ],
             ),
-
             // Content
             Padding(
               padding: const EdgeInsets.all(16),
@@ -674,7 +538,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-
                   // Rating & Reviews
                   Row(
                     children: [
@@ -702,13 +565,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                         size: 16,
                       ),
                       const SizedBox(width: 4),
-
                       if (item['distance'] == null)
-                        Text('N/A')
+                        const Text('N/A')
                       else
                         Text(
                           _formatDistance(item['distance'].toDouble()),
-                          //item['distanceText']?.toString() ?? 'N/A',
                           style: const TextStyle(
                             color: Colors.grey,
                             fontSize: 13,
@@ -717,7 +578,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     ],
                   ),
                   const SizedBox(height: 8),
-
                   // Address
                   Row(
                     children: [
@@ -741,7 +601,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-
                   // Services Tags
                   if (item['services'] != null && item['services'] is List)
                     Wrap(
@@ -782,6 +641,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
+  // --- Sort Options Bottom Sheet ---
   void _showSortOptions() {
     showModalBottomSheet(
       context: context,
@@ -813,32 +673,37 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ),
-            ...List.generate(
-              _sortOptions.length,
-              (index) => ListTile(
-                leading: Radio<String>(
-                  value: _sortOptions[index],
-                  groupValue: _sortBy,
-                  activeColor: Theme.of(context).colorScheme.primary,
-                  onChanged: (value) {
-                    setState(() {
-                      _sortBy = value!;
-                    });
-                    _applySorting();
-                    Navigator.pop(context);
-                  },
-                ),
-                title: Text(_sortOptions[index]),
-                onTap: () {
+            ListTile(
+              leading: Radio<String>(
+                value: 'distance',
+                groupValue: _sortBy,
+                activeColor: Theme.of(context).colorScheme.primary,
+                onChanged: (value) {
                   setState(() {
-                    _sortBy = _sortOptions[index];
+                    _sortBy = value!;
                   });
-                  _applySorting();
+                  _fetchFirstPage(); // re‑fetch with new sort
                   Navigator.pop(context);
                 },
               ),
+              title: const Text('Nearest'),
             ),
-            const SizedBox(height: 20),
+            ListTile(
+              leading: Radio<String>(
+                value: 'rating',
+                groupValue: _sortBy,
+                activeColor: Theme.of(context).colorScheme.primary,
+                onChanged: (value) {
+                  setState(() {
+                    _sortBy = value!;
+                  });
+                  _fetchFirstPage();
+                  Navigator.pop(context);
+                },
+              ),
+              title: const Text('Highest Rated'),
+            ),
+            const SizedBox(height: 60),
           ],
         ),
       ),

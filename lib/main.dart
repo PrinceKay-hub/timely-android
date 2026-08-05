@@ -16,6 +16,8 @@ import 'package:booking/data/repositories/user_repository_impl.dart';
 import 'package:booking/firebase_options.dart';
 import 'package:booking/presentaion/auth/cubit/auth_cubit.dart';
 import 'package:booking/presentaion/booking/cubit/booking_cubit.dart';
+import 'package:booking/presentaion/chat/cubit_chat/chat_cubit.dart';
+import 'package:booking/presentaion/chat/cubit_presence/presence_cubit.dart';
 import 'package:booking/presentaion/connectivity/cubit/connectivity_cubit.dart';
 import 'package:booking/presentaion/provider/cubit/registration/service_registration_cubit.dart';
 import 'package:booking/presentaion/provider/cubit/service_data/service_data_cubit.dart';
@@ -29,6 +31,7 @@ import 'package:booking/presentaion/screens/location/cubit/location_cubit.dart';
 import 'package:booking/presentaion/screens/search/cubit/search_cubit.dart';
 import 'package:booking/presentaion/theme/cubit/theme_cubit.dart';
 import 'package:booking/presentaion/user/cubit/user_cubit.dart';
+import 'package:booking/routes/app_router.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -57,15 +60,18 @@ void main() async {
   await SharedPreferences.getInstance();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+   final notificationService = LocalNotificationService();
+  notificationService.initInfo(
+    navigatorKey: AppRouter.navigatorKey,
+  );
 
-  final LocalNotificationService notificationService = LocalNotificationService();
-  notificationService.initInfo();
+   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
   await Hive.initFlutter();
   await Hive.openBox('myBox');
 
-  final ImagePickerPlatform imagePickerImplementation = ImagePickerPlatform.instance;
+  final ImagePickerPlatform imagePickerImplementation =
+      ImagePickerPlatform.instance;
   if (imagePickerImplementation is ImagePickerAndroid) {
     imagePickerImplementation.useAndroidPhotoPicker = true;
   }
@@ -102,14 +108,14 @@ class MyApp extends StatelessWidget {
             storageServices: context.read<StorageService>(),
           ),
         ),
-    
+
         RepositoryProvider(create: (context) => BookingRepositoryImpl()),
         RepositoryProvider<LocalNotificationService>.value(
           value: notificationService,
         ),
-        RepositoryProvider(create: (context) => ReviewRepositoryImpl(),),
-        RepositoryProvider(create: (context) => LocationRepositoryImpl(),),
-        RepositoryProvider(create: (context) => SearchRepositoryImpl(),),
+        RepositoryProvider(create: (context) => ReviewRepositoryImpl()),
+        RepositoryProvider(create: (context) => LocationRepositoryImpl()),
+        RepositoryProvider(create: (context) => SearchRepositoryImpl()),
         RepositoryProvider(create: (_) => FavoriteRepositryImpl()),
       ],
       child: MultiBlocProvider(
@@ -141,32 +147,43 @@ class MyApp extends StatelessWidget {
               notificationService: notificationService,
             ),
           ),
-          BlocProvider(create: (context) => ReviewCubit(
-            repositoryImpl: context.read<ReviewRepositoryImpl>(),
-          ),),
-          BlocProvider(create: (context) => LocationCubit(
-            locationRepositoryImpl: context.read<LocationRepositoryImpl>(),
-          ),),
-          BlocProvider(create: (context) => SearchCubit(
-            searchRepositoryImpl: context.read<SearchRepositoryImpl>()),),
-          BlocProvider<SetLocationCubit>(create: (context) => SetLocationCubit(),),
           BlocProvider(
-          create: (context) => FavoriteCubit(
-            favoriteService: context.read<FavoriteRepositryImpl>(),
-          )..loadFavorites(),
+            create: (context) => ReviewCubit(
+              repositoryImpl: context.read<ReviewRepositoryImpl>(),
+            ),
           ),
-          BlocProvider(create: (context) => ServiceDetailCubit(context.read<ServiceRepositoryImpl>()),),
+          BlocProvider(
+            create: (context) => LocationCubit(
+              locationRepositoryImpl: context.read<LocationRepositoryImpl>(),
+            ),
+          ),
+          BlocProvider(
+            create: (context) => SearchCubit(
+              repository: context.read<SearchRepositoryImpl>(),
+            ),
+          ),
+          BlocProvider<SetLocationCubit>(
+            create: (context) => SetLocationCubit(),
+          ),
+          BlocProvider(
+            create: (context) => FavoriteCubit(
+              favoriteService: context.read<FavoriteRepositryImpl>(),
+            )..loadFavorites(),
+          ),
+          BlocProvider(
+            create: (context) =>
+                ServiceDetailCubit(context.read<ServiceRepositoryImpl>()),
+          ),
           BlocProvider(
             create: (context) => HomeCubit(
               categoryRepository: CategoryRepository(Hive.box('myBox')),
               locationService: LocationService(),
-            ), ),
-          BlocProvider(
-            create: (context) => ConnectivityCubit(),
+            ),
           ),
-          BlocProvider(
-          create: (context) => PortfolioCubit(),
-        )
+          BlocProvider(create: (context) => ConnectivityCubit()),
+          BlocProvider(create: (context) => PortfolioCubit()),
+          BlocProvider(create: (_) => ChatCubit()),
+          BlocProvider(create: (_) => PresenceCubit()),
         ],
         child: const ThemeApp(),
       ),

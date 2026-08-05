@@ -16,7 +16,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 class ServiceForm extends StatefulWidget {
   final Map<String, dynamic>? data;
   final String? userId; //
-  const ServiceForm({super.key, this.data, this.userId});
+  final bool? isProvider;
+  const ServiceForm({super.key, this.data, this.userId, this.isProvider});
 
   @override
   State<ServiceForm> createState() => _ServiceFormState();
@@ -69,7 +70,7 @@ class _ServiceFormState extends State<ServiceForm> {
       }
       cubit.updateService(imageFiles);
     } else {
-      cubit.registerService(imageFiles);
+      cubit.registerService(imageFiles, widget.isProvider!);
     }
   }
 

@@ -84,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context); 
     return  BlocListener<ConnectivityCubit, ConnectivityState>(
       listener: (context, state) {
         if (state.status == ConnectivityStatus.offline) {

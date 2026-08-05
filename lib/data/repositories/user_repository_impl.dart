@@ -69,51 +69,19 @@ class UserRepositoryImpl extends UserRepository {
   @override
   Future<void> updateProviderProfile({
   required String providerId,
-  String? serviceId,
-  Map<String, dynamic>? additionalInfo,
 }) async {
   try {
     final updateData = <String, dynamic>{};
-    print(serviceId);
-
-    if (serviceId != null) {
-      print('This is serviceId: $serviceId');
-      print('This is providerId: $providerId');
-      updateData['service'] = serviceId;
-      
-    }
-
-    if (additionalInfo != null) {
-      updateData.addAll(additionalInfo);
-    }
 
     updateData['updatedAt'] = FieldValue.serverTimestamp();
     updateData['isProvider'] = true;
+    updateData['userType'] = 'provider';
 
     await _firestore.collection('users').doc(providerId).update(updateData);
   } catch (e) {
     throw Exception('Failed to update provider profile: $e');
   }
 }
-
-  @override
-  Future<List<UserEntity>> getServiceProviders() async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('users')
-          .where('userType', whereIn: ['provider', 'admin'])
-          .where('isProvider', isEqualTo: true)
-          .get();
-      
-      return querySnapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return UserModel.fromJson(data).toEntity();
-      }).toList();
-    } catch (e) {
-      throw Exception('Failed to get service providers: $e');
-    }
-  }
 
   @override
   Future<UserEntity?> getCurrentUser() async {
@@ -127,8 +95,6 @@ class UserRepositoryImpl extends UserRepository {
       
       final userData = doc.data()!;
       userData['id'] = doc.id;
-
-      print('User Data in Home Screen: $userData');
       
       return UserModel.fromJson(userData).toEntity();
     } catch (e) {
@@ -151,24 +117,6 @@ class UserRepositoryImpl extends UserRepository {
       return UserModel.fromJson(userData).toEntity();
     });
   }
-
-  @override
-  Future<void> updateUserType(String type)async {
-    try {
-      final String userId = _firebaseAuth.currentUser!.uid;
-
-      
-      await _firestore.collection('users').doc(userId).update(
-        {
-          'userType': type,
-          'hasService': true
-        }
-      );
-    } catch (e) {
-      throw Exception('Failed to update user: $e');
-    }
-  }
-
 
     /// Real‑time stream of the user's Firestore document
   @override

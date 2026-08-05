@@ -1,5 +1,6 @@
 // lib/presentation/home/widgets/special_offers_card.dart
 import 'package:booking/presentaion/provider/pages/registration_screen.dart';
+//import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 
 class SpecialOffersCard extends StatelessWidget {
@@ -9,7 +10,16 @@ class SpecialOffersCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
 
-   /* Future<void> seedHairstyles() async {
+    bool parseBool(dynamic value) {
+      if (value == null) return false;
+      if (value is bool) return value;
+      if (value is String) return value.toLowerCase() == 'true';
+      if (value is int) return value != 0; // Handles 1/0 just in case
+      return false;
+    }
+
+    final isProvider = parseBool(user['isProvider']);
+    /* Future<void> seedHairstyles() async {
       final db = FirebaseFirestore.instance;
 
       final List<Map<String, dynamic>> allStyles = [
@@ -529,7 +539,7 @@ class SpecialOffersCard extends StatelessWidget {
                       const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () async {
-                         /* try {
+                          /* try {
                             await seedHairstyles();
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
@@ -540,8 +550,24 @@ class SpecialOffersCard extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text('❌ Error: $e')),
                             );
+                          }
+                          try {
+                            if (user['isProvider'] == true) {
+                              await FirebaseAnalytics.instance.logEvent(
+                                name: 'provider_signup_complete',
+                                parameters: {
+                                  'provider_id': '123456789',
+                                  'service_id': '9874563214563',
+                                  'method': 'app',
+                                },
+                              );
+                              print('logged');
+                            }
+                          } catch (e) {
+                            print(e.toString());
                           }*/
-                          if (user['isEmailVerified'] == false) {
+
+                            if (user['isEmailVerified'] == false) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 backgroundColor: Colors.red,
@@ -557,6 +583,7 @@ class SpecialOffersCard extends StatelessWidget {
                               MaterialPageRoute(
                                 builder: (context) => ServiceRegistrationScreen(
                                   userId: user['id'] ?? '',
+                                  isProvider: isProvider,
                                 ),
                               ),
                             );

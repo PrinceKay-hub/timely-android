@@ -8,7 +8,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 class ServiceRegistrationScreen extends StatefulWidget {
   final String userId;
-  const ServiceRegistrationScreen({super.key, required this.userId});
+  final bool isProvider;
+  const ServiceRegistrationScreen({super.key, required this.userId, required this.isProvider});
 
   @override
   State<ServiceRegistrationScreen> createState() =>
@@ -85,6 +86,7 @@ class _ServiceRegistrationScreenState extends State<ServiceRegistrationScreen> {
                 MaterialPageRoute(
                   builder: (context) => ServiceForm(
                     userId: widget.userId,
+                    isProvider: widget.isProvider,
                   ),
                 ),
               );
@@ -131,6 +133,7 @@ class _ServiceRegistrationScreenState extends State<ServiceRegistrationScreen> {
                 MaterialPageRoute(
                   builder: (context) => ServiceForm(
                     userId: widget.userId,
+                    isProvider: widget.isProvider,
                   ),
                 ),
               );

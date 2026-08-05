@@ -195,6 +195,7 @@ class AppointmentCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Text(
                             price,
                             style: TextStyle(

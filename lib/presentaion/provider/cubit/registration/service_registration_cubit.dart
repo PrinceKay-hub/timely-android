@@ -101,7 +101,7 @@ class ServiceRegistrationCubit extends Cubit<ServiceRegistrationState> {
   void updateServiceLandmark(String landmark) =>
     _update((s) => s.copyWith(landmark: landmark));
   
-  Future<void> registerService(List<String> files) async {
+  Future<void> registerService(List<String> files, bool isProvider) async {
     print('registerService called with files: $files');
     emit(ServiceRegistrationLoading());
     try {
@@ -139,14 +139,13 @@ class ServiceRegistrationCubit extends Cubit<ServiceRegistrationState> {
         status: 'pending',
       );
 
-      final serviceId = await serviceRepository.createService(service);
+      await serviceRepository.createService(service, isProvider);
 
       sendnotification('MPwYNw6jTPWYsvgL6dkuufYKFjx2', 'New Listing',
           'Waiting for approval');
 
       await userRepository.updateProviderProfile(
         providerId: _currentService.providerId,
-        serviceId: serviceId,
       );
       print('Registration success');
       emit(ServiceRegistrationSuccess());

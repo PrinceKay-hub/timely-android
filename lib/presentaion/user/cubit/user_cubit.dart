@@ -56,16 +56,6 @@ class UserCubit extends Cubit<UserState> {
     }
   }
 
-  Future<void> updateUserType(String userType ) async {
-    emit(UserLoading());
-    try{
-      await userRepository.updateUserType(userType);
-      await loadUser();
-    } catch (e){
-      emit(UserError("Error switching user: $e"));
-    }
-  }
-
 
   @override
   Future<void> close() {

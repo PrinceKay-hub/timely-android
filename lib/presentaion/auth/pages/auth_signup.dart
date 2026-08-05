@@ -11,8 +11,9 @@ import '../../screens/profile/terms.dart';
 
 class AuthSignup extends StatefulWidget {
   final VoidCallback onToggle;
+  final String? from;
 
-  const AuthSignup({super.key, required this.onToggle});
+  const AuthSignup({super.key, required this.onToggle, this.from});
 
   @override
   State<AuthSignup> createState() => _AuthSignupState();
@@ -85,7 +86,13 @@ class _AuthSignupState extends State<AuthSignup> {
             );
           }
           if (state is AuthAuthenticated || state is AuthAuthenticatedGoog) {
-            context.go('/home-entry');
+            // Mirrors AuthLogin: honor `from` so a brand-new user who
+            // signed up from a shared link lands on that page instead of
+            // the generic home screen.
+            final destination = (widget.from != null && widget.from!.isNotEmpty)
+                ? widget.from!
+                : '/home-entry';
+            context.go(destination);
           }
         },
         builder: (context, state) {

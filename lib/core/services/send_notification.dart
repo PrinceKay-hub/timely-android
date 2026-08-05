@@ -8,6 +8,7 @@ class SendNotificationService {
   required String deviceToken,
   required String title,
   required String body,
+   Map<String, String>? data,
 }) async {
   // Get current user
   final user = FirebaseAuth.instance.currentUser;
@@ -24,6 +25,7 @@ class SendNotificationService {
     'token': deviceToken,
     'title': title,
     'body': body,
+    'data': data,
   };
 
   try {

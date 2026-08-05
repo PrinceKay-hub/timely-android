@@ -6,16 +6,9 @@ abstract class UserRepository {
   
   Future<void> updateUser(String displayName, );
   Future<void> updateUserContact(String phone, );
-
-  Future<void> updateUserType(String type);
-  
   Future<void> updateProviderProfile({
     required String providerId,
-    String? serviceId,
-    Map<String, dynamic>? additionalInfo,
   });
-
-  Future<List<UserEntity>> getServiceProviders();
   
   Future<UserEntity?> getCurrentUser();
   

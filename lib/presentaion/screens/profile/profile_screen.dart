@@ -107,6 +107,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
   });
 }
 
+bool parseBool(dynamic value) {
+  if (value == null) return false;
+  if (value is bool) return value;
+  if (value is String) return value.toLowerCase() == 'true';
+  if (value is int) return value != 0; // Handles 1/0 just in case
+  return false;
+}
+
+
   @override
   void dispose() {
     timer?.cancel();
@@ -117,6 +126,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final themeCubit = context.watch<ThemeCubit>();
     bool isDarkMode = themeCubit.isDarkMode;
+
+final isProvider = parseBool(widget.user['isProvider']);
 
     return Scaffold(
       body: SingleChildScrollView(
@@ -276,7 +287,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => ServiceRegistrationScreen(
-                                userId: widget.user['id'],
+                                userId: widget.user['id'] ?? null,
+                                isProvider: isProvider,
                               ),
                             ),
                           );

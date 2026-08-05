@@ -27,8 +27,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         child: _isLogin
-            ? AuthLogin(onToggle: _toggleAuthMode, from: widget.from,)
-            : AuthSignup(onToggle: _toggleAuthMode),
+            ? AuthLogin(onToggle: _toggleAuthMode, from: widget.from)
+            // `from` needs to survive the login <-> signup toggle too —
+            // otherwise a new user who lands here from a shared link and
+            // picks "Sign Up" loses the destination the moment they
+            // switch forms, before they've even submitted anything.
+            : AuthSignup(onToggle: _toggleAuthMode, from: widget.from),
       ),
     );
   }

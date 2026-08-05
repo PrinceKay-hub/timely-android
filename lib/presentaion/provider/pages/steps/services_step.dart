@@ -56,13 +56,13 @@ class _ServicesStepState extends State<ServicesStep> {
   }
 
   void _showAddServiceDialog(BuildContext context) {
-  String price = '';          // For fixed price
-  String priceMin = '';       // For range min
-  String priceMax = '';       // For range max
+  String price = '';          
+  String priceMin = '';       
+  String priceMax = '';       
   String duration = '';
   String? selectedService;
   String durationUnit = 'Minutes';
-  String priceType = 'Fixed'; // 'Fixed' or 'Range'
+  String priceType = 'Fixed'; 
   final cubit = context.read<ServiceRegistrationCubit>();
 
   showDialog(

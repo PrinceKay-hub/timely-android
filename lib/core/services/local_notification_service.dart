@@ -1,52 +1,8 @@
+import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-
- @pragma('vm:entry-point')
-  Future<void> _firebaseMessagingBGHandler(RemoteMessage message) async {
-    //await _handleForegroundMessage(message);
-    print('Handling a background message: ${message.messageId}');
-    await showLocalNotification(message);
-  
-  }
-
-  Future<void> showLocalNotification(RemoteMessage message) async {
-  // Initialize flutter_local_notifications
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
-
-  // Android settings
-  const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-  final DarwinInitializationSettings initializationSettingsIOS =
-      DarwinInitializationSettings();
-  final InitializationSettings initializationSettings = InitializationSettings(
-    android: initializationSettingsAndroid,
-    iOS: initializationSettingsIOS,
-  );
-  await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
-
-  // Create notification details
-  const AndroidNotificationDetails androidPlatformChannelSpecifics =
-      AndroidNotificationDetails(
-    'appointment_channel',
-    'Appointment Notifications',
-    importance: Importance.max,
-    priority: Priority.high,
-    showWhen: false,
-  );
-  const NotificationDetails platformChannelSpecifics = NotificationDetails(
-    android: androidPlatformChannelSpecifics,
-    iOS: DarwinNotificationDetails(),
-  );
-
-  // Show the notification
-  await flutterLocalNotificationsPlugin.show(
-   id: message.data.hashCode, // unique id
-   title:  message.notification?.title ?? message.data['title'] ?? 'Appointment Update',
-   body:  message.notification?.body ?? message.data['body'] ?? 'You have a new notification',
-   notificationDetails:  platformChannelSpecifics,
-  );
-}
+import 'package:go_router/go_router.dart';
 
 class LocalNotificationService {
   static final LocalNotificationService _instance =
@@ -55,14 +11,43 @@ class LocalNotificationService {
   LocalNotificationService._internal();
 
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  GlobalKey<NavigatorState>? navigatorKey;
 
-  void initInfo() async {
-    await _setupNotifications();
-    // Request permissions
+  void initInfo({required GlobalKey<NavigatorState>? navigatorKey}) {
+    this.navigatorKey = navigatorKey;
+    _setupNotifications();
+    _requestPermissions();
+    _setupListeners();
+  }
+
+  Future<void> _setupNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+          android: initializationSettingsAndroid,
+          iOS: initializationSettingsIOS,
+        );
+
+    await _notificationsPlugin.initialize(
+      settings: initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        // Called when a local notification is tapped (including when app is terminated)
+        _handleNavigation(response.payload);
+      },
+    );
+  }
+
+  Future<void> _requestPermissions() async {
     await _firebaseMessaging.requestPermission(
       alert: true,
       announcement: false,
@@ -72,69 +57,84 @@ class LocalNotificationService {
       provisional: false,
       sound: true,
     );
-    FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+  }
+
+  void _setupListeners() {
+    // Foreground messages (app is visible)
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      _showLocalNotification(
+        title: message.notification?.title,
+        body: message.notification?.body,
+        payload: _buildPayload(message.data),
+      );
+    });
+
+    // App opened from a notification (background/terminated)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Message clicked!: ${message.data}');
-      // Handle navigation or other actions based on message data
+      _handleNavigation(_buildPayload(message.data));
+    });
+
+    // App launched from terminated state with a notification
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        _handleNavigation(_buildPayload(message.data));
+      }
     });
   }
 
-  Future<void> _setupNotifications() async {
-  // Initialize local notifications
-  const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
-        );
-
-    const InitializationSettings initializationSettings =
-        InitializationSettings(
-          android: initializationSettingsAndroid,
-          iOS: initializationSettingsIOS,
-        );
-
-    await _notificationsPlugin.initialize(settings: initializationSettings);
-
-}
-
-  Future<void> _handleForegroundMessage(RemoteMessage message) async {
-   
-    await _showLocalNotification(
-        title: message.notification?.title,
-        body: message.notification?.body,
-        payload: message.data.toString(),
-      );
+  // Build a JSON‑string payload containing type and chatId
+  String _buildPayload(Map<String, dynamic> data) {
+    return jsonEncode({
+      'type': data['type'] ?? 'chat',
+      'chatId': data['chatId'] ?? '',
+    });
   }
 
+  // Show local notification when app is in foreground
   Future<void> _showLocalNotification({
-  String? title,
-  String? body,
-  String? payload,
-}) async {
-  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-    'appointment_channel',
-    'Appointment Notifications',
-    channelDescription: 'Notifications when app is in foreground',
-    importance: Importance.max,
-    priority: Priority.high,
-    showWhen: true,
-  );
+    String? title,
+    String? body,
+    String? payload,
+  }) async {
+    const AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          'appointment_channel',
+          'Appointment Notifications',
+          channelDescription: 'Notifications when app is in foreground',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: true,
+        );
+    const DarwinNotificationDetails iosDetails = DarwinNotificationDetails();
 
-  const DarwinNotificationDetails iosDetails = DarwinNotificationDetails();
+    await _notificationsPlugin.show(
+      id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      ),
+      payload: payload,
+    );
+  }
 
-  await _notificationsPlugin.show(
-    id: DateTime.now().millisecondsSinceEpoch.remainder(100000),
-    title: title,
-    body: body,
-    notificationDetails: const NotificationDetails(android: androidDetails, iOS: iosDetails),
-    payload: payload,
-  );
-}
-
-
-
+  // Navigation helper
+  void _handleNavigation(String? payload) {
+    if (payload == null) return;
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      final type = data['type'] as String?;
+      final chatId = data['chatId'] as String?;
+      if (type == 'chat' && chatId != null && chatId.isNotEmpty) {
+        final context = navigatorKey?.currentContext;
+        if (context != null) {
+          // Use GoRouter to navigate to the chat screen
+          GoRouter.of(context).push('/chat/$chatId');
+        }
+      }
+    } catch (e) {
+      print('Navigation error: $e');
+    }
+  }
 }

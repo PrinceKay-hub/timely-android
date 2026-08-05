@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "131563851716",
+    "firebase_url": "https://booking-cd20f-default-rtdb.firebaseio.com",
     "project_id": "booking-cd20f",
     "storage_bucket": "booking-cd20f.firebasestorage.app"
   },
@@ -38,14 +39,15 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "131563851716-nv4agnun3tn00mtbbgshpk8m9jcdd0me.apps.googleusercontent.com",
+              "client_id": "131563851716-bopcqg6t8714fmfps2826gb3bi10abhb.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "131563851716-ge02a3qd05ag5lj1gvfhnbtr46rqorkk.apps.googleusercontent.com",
+              "client_id": "131563851716-2og4oua7smmtbvnviqja3je1q5o6g5bt.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.booking"
+                "bundle_id": "com.timely.booking",
+                "app_store_id": "6739708162"
               }
             }
           ]
@@ -77,14 +79,15 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "131563851716-nv4agnun3tn00mtbbgshpk8m9jcdd0me.apps.googleusercontent.com",
+              "client_id": "131563851716-bopcqg6t8714fmfps2826gb3bi10abhb.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "131563851716-ge02a3qd05ag5lj1gvfhnbtr46rqorkk.apps.googleusercontent.com",
+              "client_id": "131563851716-2og4oua7smmtbvnviqja3je1q5o6g5bt.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.booking"
+                "bundle_id": "com.timely.booking",
+                "app_store_id": "6739708162"
               }
             }
           ]
@@ -140,14 +143,15 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "131563851716-nv4agnun3tn00mtbbgshpk8m9jcdd0me.apps.googleusercontent.com",
+              "client_id": "131563851716-bopcqg6t8714fmfps2826gb3bi10abhb.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "131563851716-ge02a3qd05ag5lj1gvfhnbtr46rqorkk.apps.googleusercontent.com",
+              "client_id": "131563851716-2og4oua7smmtbvnviqja3je1q5o6g5bt.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.example.booking"
+                "bundle_id": "com.timely.booking",
+                "app_store_id": "6739708162"
               }
             }
           ]

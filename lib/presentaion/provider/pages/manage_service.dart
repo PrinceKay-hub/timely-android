@@ -95,7 +95,9 @@ class ManageService extends StatelessWidget {
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) =>
-                                          ServiceForm(data: data,),
+                                          ServiceForm(
+                                            data: data,
+                                        ),
                                     ),
                                   ),
                                   icon: Icon(

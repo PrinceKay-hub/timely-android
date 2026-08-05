@@ -43,7 +43,7 @@ class CategoriesSection extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => Categorysearch(
+                            builder: (context) => CategoryResultsScreen(
                               category: category['name'],
                               user: user,
                             ),

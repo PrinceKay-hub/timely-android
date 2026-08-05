@@ -13,8 +13,7 @@ class UserModel extends UserEntity {
     super.createdAt,
     super.isEmailVerified,
     super.providerProfile,
-    super.hasService,
-    super.service
+    super.isProvider,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -32,8 +31,7 @@ class UserModel extends UserEntity {
           : DateTime.now(),
       isEmailVerified: json['isEmailVerified'] ?? false,
       providerProfile: json['providerProfile'],
-      hasService: json['hasService'] ?? false,
-      service: json['service'] ?? '',
+      isProvider: json['isProvider'] ?? false,
     );
   }
 
@@ -55,8 +53,7 @@ class UserModel extends UserEntity {
           : DateTime.now(),
       isEmailVerified: firebaseUser.emailVerified,
       providerProfile: userData['providerProfile'],
-      hasService: false,
-      service: userData['service'] ?? '',
+      isProvider: userData['isProvider'] ?? false,
     );
   }
 
@@ -76,8 +73,7 @@ class UserModel extends UserEntity {
           : DateTime.now(),
       isEmailVerified: userData['isEmailVerified'] ?? false,
       providerProfile: userData['providerProfile'],
-      hasService: false,
-      service: userData['service'] ?? '',
+      isProvider: userData['isProvider'] ?? false,
     );
   }
 
@@ -93,8 +89,7 @@ class UserModel extends UserEntity {
       createdAt: entity.createdAt,
       isEmailVerified: entity.isEmailVerified,
       providerProfile: entity.providerProfile,
-      hasService: entity.hasService,
-      service: entity.service
+      isProvider: entity.isProvider
     );
   }
 
@@ -108,8 +103,7 @@ class UserModel extends UserEntity {
       'createdAt': createdAt ?? DateTime.now(),
       'isEmailVerified': isEmailVerified,
       'providerProfile': providerProfile,
-      'hasService': hasService,
-      'service': service
+      'isProvider': isProvider,
     };
   }
 
@@ -123,8 +117,7 @@ class UserModel extends UserEntity {
       createdAt: createdAt,
       isEmailVerified: isEmailVerified,
       providerProfile: providerProfile,
-      hasService: hasService,
-      service: service
+      isProvider: isProvider
     );
   }
   

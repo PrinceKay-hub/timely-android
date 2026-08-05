@@ -1,10 +1,12 @@
 const functions = require("firebase-functions");
-const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {onDocumentCreated, onDocumentWritten} =
+require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const crypto = require("crypto");
 const {defineSecret} = require("firebase-functions/params");
 const {fal} = require("@fal-ai/client");
+const {geohashQueryBounds, distanceBetween, geohashForLocation} =
+require("geofire-common");
 const admin = require("firebase-admin");
 admin.initializeApp();
 
@@ -48,13 +50,17 @@ functions.https.onRequest(async (req, res) => {
     // if (!decodedToken.admin) return res.status(403).send("Forbidden");
 
     // Now proceed with sending notification
-    const {token, title, body} = req.body;
+    const {token, title, body, data} = req.body;
     if (!token || !title || !body) {
       return res.status(400).send("Missing fields");
     }
 
     const message = {
       notification: {title, body},
+      data: {
+        type: req.body.type || "chat",
+        chatId: req.body.chatId || "",
+      },
       token,
       // ✅ iOS sound config
       apns: {
@@ -69,6 +75,12 @@ functions.https.onRequest(async (req, res) => {
         },
       },
     };
+
+    // Add data payload if provided
+    if (data && typeof data === "object") {
+      message.data = data;
+    }
+
     const response = await admin.messaging().send(message);
     res.status(200).json({success: true, messageId: response});
   } catch (error) {
@@ -280,48 +292,66 @@ admin.firestore.Timestamp.fromDate(sixtyFiveMinutesLater);
 });
 
 
-// Simple in‑memory cache (per function instance)
-// Note: This cache is not shared across
-// instances, but helps for repeated calls to the same instance.
-const cache = new Map();
-const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+// ─────────────────────────────────────────────────────────────────────────
+// GEOHASH-BASED SEARCH
+//
+// Every services/{serviceId} document is expected to carry a `geohash`
+// field (kept in sync automatically by syncProviderGeohash below). Search
+// queries use geohashQueryBounds to run a small set of range queries that
+// only read documents in the geographically relevant area, instead of
+// reading the entire "services" collection on every search.
+// ─────────────────────────────────────────────────────────────────────────
 
-// Haversine distance function (same as before)
 /**
- * Calculates the distance between two geographic
- * coordinates using the Haversine formula.
- * @param {number} lat1 - Latitude of the first point in degrees.
- * @param {number} lon1 - Longitude of the first point in degrees.
- * @param {number} lat2 - Latitude of the second point in degrees.
- * @param {number} lon2 - Longitude of the second point in degrees.
- * @return {number} Distance in kilometers.
+ * Firestore trigger: keeps `geohash` in sync automatically on every create
+ * or update to a services/{serviceId} document, regardless of which client
+ * code path wrote it (app, admin panel, bulk import, etc). This is the
+ * safety net for new data — no write path has to remember to compute the
+ * geohash itself.
+ *
+ * The equality check before writing prevents an infinite loop: updating
+ * `after.ref` inside this function would otherwise re-trigger itself.
  */
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // km
-  const dLat = (lat2 - lat1) * (Math.PI / 180);
-  const dLon = (lon2 - lon1) * (Math.PI / 180);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * (Math.PI / 180)) *
-    Math.cos(lat2 * (Math.PI / 180)) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+exports.syncProviderGeohash =
+onDocumentWritten("services/{serviceId}", async (event) => {
+  const after = event.data?.after;
+  if (!after || !after.exists) return; // document deleted, nothing to sync
 
-// Generate a cache key from all search parameters
+  const data = after.data();
+  if (data.latitude == null || data.longitude == null) return;
+
+  const correctGeohash = geohashForLocation([data.latitude, data.longitude]);
+  if (data.geohash !== correctGeohash) {
+    await after.ref.update({geohash: correctGeohash});
+  }
+});
+
+
+exports.syncUserData = onDocumentWritten("users/{userId}", async (event) => {
+  const after = event.data?.after;
+  if (!after || !after.exists) return; // document deleted, nothing to sync
+
+  const data = after.data();
+  const userId = after.id;
+
+  // If the user is a provider, update their services with the new name
+  if (data.isProvider === null || data.isProvider === undefined) {
+    const usersSnapshot = await db.collection("users")
+        .where("id", "==", userId)
+        .get();
+
+    const batch = db.batch();
+    usersSnapshot.forEach((usereDoc) => {
+      batch.update(usereDoc.ref, {isProvider: false});
+    });
+    await batch.commit();
+  }
+});
+
 /**
- * Generates an MD5 hash key from the provided parameters object for caching.
- * @param {Object} params - The parameters to hash.
- * @return {string} A hex string representing the hash.
+ * Searches approved providers within a radius of the user's location,
+ * optionally filtered by region/district and a free-text query.
  */
-function generateCacheKey(params) {
-  const hash = crypto.createHash("md5");
-  hash.update(JSON.stringify(params));
-  return hash.digest("hex");
-}
-
 exports.searchProviders = onCall(async (request) => {
   const {
     query = "",
@@ -331,8 +361,8 @@ exports.searchProviders = onCall(async (request) => {
     userLng,
     maxDistanceKm = 20,
     sortBy = "distance",
-    page = 1, // default page 1
-    pageSize = 20, // default page size
+    page = 1,
+    pageSize = 20,
   } = request.data;
 
   if (userLat == null || userLng == null) {
@@ -341,131 +371,107 @@ exports.searchProviders = onCall(async (request) => {
         "User location is required.",
     );
   }
-
-  // Validate pagination parameters
-  const validPage = Math.max(1, page);
-  const validPageSize = Math.min(50, Math.max(1, pageSize));
-  // limit to 50
-
-  // Build cache key from all inputs
-  const cacheKey = generateCacheKey({
-    query,
-    region,
-    district,
-    userLat,
-    userLng,
-    maxDistanceKm,
-    sortBy,
-    page: validPage,
-    pageSize: validPageSize,
-  });
-
-  // Check cache
-  const cached = cache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
-    console.log("Cache hit");
-    return cached.data;
+  if (typeof maxDistanceKm !== "number" || maxDistanceKm <= 0) {
+    throw new functions.https.HttpsError(
+        "invalid-argument",
+        "maxDistanceKm must be a positive number.",
+    );
   }
 
-  console.log("Cache miss – executing query");
+  const center = [userLat, userLng];
+  const radiusMeters = maxDistanceKm * 1000;
+  const bounds = geohashQueryBounds(center, radiusMeters);
 
-  // Build Firestore query
-  let firestoreQuery = db.collection("services");
+  let snapshots;
+  try {
+    const queryPromises = bounds.map(([start, end]) => {
+      let q = db.collection("services")
+          .where("status", "==", "approved");
 
-  firestoreQuery = firestoreQuery.where("status", "==", "approved");
+      if (region && region.trim() !== "") {
+        q = q.where("region", "==", region);
+        if (district && district.trim() !== "") {
+          q = q.where("district", "==", district);
+        }
+      }
 
-  if (region !== "Ghana") {
-    firestoreQuery = firestoreQuery.where("region", "==", region);
-    if (district && district.trim() !== "") {
-      firestoreQuery = firestoreQuery.where("district", "==", district);
-    }
+      q = q.orderBy("geohash").startAt(start).endAt(end);
+      return q.get();
+    });
+    snapshots = await Promise.all(queryPromises);
+  } catch (err) {
+    console.error("Firestore geo query failed:", err);
+    throw new functions.https.HttpsError(
+        "internal",
+        "Search failed. Please try again.",
+    );
   }
 
-  // Execute the query (fetch all matching documents)
-  const snapshot = await firestoreQuery.get();
+  const queryLower = query.toLowerCase().trim();
+  const queryTokens = queryLower.split(/\s+/).filter(Boolean);
+  const seen = new Set();
   const allResults = [];
 
-  snapshot.forEach((doc) => {
-    const provider = doc.data();
-    const providerLat = provider.latitude;
-    const providerLng = provider.longitude;
+  for (const snapshot of snapshots) {
+    snapshot.forEach((doc) => {
+      if (seen.has(doc.id)) return; // overlapping geohash bounds return dupes
+      seen.add(doc.id);
 
-    const name = (provider.name || "").toLowerCase();
-    const category = (provider.category || "").toLowerCase();
-    const serviceNames = Array.isArray(provider.services) ?
-    provider.services
-        .map((s) => s.name)
-        .filter((name) => name != null)
-        .map((name) => String(name).toLowerCase()) :
+      const provider = doc.data();
+      if (provider.latitude == null || provider.longitude == null) return;
+
+      // The geohash box is a square; trim it down to an actual circle.
+      const distanceKm =
+      distanceBetween(center, [provider.latitude, provider.longitude]);
+      if (distanceKm > maxDistanceKm) return;
+
+      if (queryTokens.length > 0) {
+        const name = (provider.name || "").toLowerCase();
+        const category = (provider.category || "").toLowerCase();
+        const serviceNames = Array.isArray(provider.services) ?
+          provider.services
+              .map((s) => (s && s.name ? String(s.name).toLowerCase() : ""))
+              .filter(Boolean) :
           [];
-    const queryLower = query.toLowerCase();
-
-    const matchesQuery =
-      query === "" ||
-      name.includes(queryLower) ||
-      category.includes(queryLower) ||
-      serviceNames.some((s) => s.includes(queryLower));
-
-    if (!matchesQuery) return;
-
-    // Distance handling – include even if coordinates missing
-    let distance = null;
-
-    if (providerLat != null && providerLng != null) {
-      distance = calculateDistance(
-          userLat, userLng, providerLat, providerLng);
-      if (distance > maxDistanceKm) return; // skip if too far
-    }
-
-    allResults.push({
-      id: doc.id,
-      ...provider,
-      distance: distance,
-      distanceText:
-      distance !== null ? `${distance.toFixed(1)} km`:"Location unavailable",
-    });
-  });
-
-  // Sort results – put providers without coordinates
-  // at the end when sorting by distance
-  if (sortBy === "distance") {
-    allResults.sort((a, b) => {
-      if (
-        a.distance != null && b.distance != null) {
-        return a.distance - b.distance;
+        const haystack = `${name} ${category} ${serviceNames.join(" ")}`;
+        const matchesAllTokens = queryTokens.every((t) => haystack.includes(t));
+        if (!matchesAllTokens) return;
       }
-      if (a.distance == null) return 1;
-      if (b.distance == null) return -1;
-      return 0;
+
+      allResults.push({
+        id: doc.id,
+        ...provider,
+        distance: distanceKm,
+        distanceText: `${distanceKm.toFixed(1)} km`,
+      });
     });
+  }
+
+  if (sortBy === "distance") {
+    allResults.sort((a, b) => a.distance - b.distance);
   } else if (sortBy === "rating") {
     allResults.sort((a, b) => (b.rating || 0) - (a.rating || 0));
   }
 
-  // Paginate
-  const totalCount = allResults.length;
+  const validPage = Math.max(1, page);
+  const validPageSize = Math.min(50, Math.max(1, pageSize));
   const startIndex = (validPage - 1) * validPageSize;
   const paginatedResults =
   allResults.slice(startIndex, startIndex + validPageSize);
 
-  const responseData = {
+  return {
     providers: paginatedResults,
-    totalCount,
+    totalCount: allResults.length,
     page: validPage,
     pageSize: validPageSize,
-    hasMore: startIndex + validPageSize < totalCount,
+    hasMore: startIndex + validPageSize < allResults.length,
   };
-
-  // Store in cache
-  cache.set(cacheKey, {
-    timestamp: Date.now(),
-    data: responseData,
-  });
-
-  return responseData;
 });
 
-
+/**
+ * Searches approved providers of a specific category within a radius of
+ * the user's location. Same geohash-bounded approach as searchProviders.
+ */
 exports.searchByCategory = onCall(async (request) => {
   const {
     category,
@@ -473,114 +479,106 @@ exports.searchByCategory = onCall(async (request) => {
     userLng,
     maxDistanceKm = 20,
     sortBy = "distance",
-    page = 1, // default page 1
-    pageSize = 20, // default page size
+    page = 1,
+    pageSize = 20,
   } = request.data;
 
+  if (!category || typeof category !== "string") {
+    throw new functions.https.HttpsError(
+        "invalid-argument",
+        "category is required.",
+    );
+  }
   if (userLat == null || userLng == null) {
     throw new functions.https.HttpsError(
         "invalid-argument",
         "User location is required.",
     );
   }
-
-  // Validate pagination parameters
-  const validPage = Math.max(1, page);
-  const validPageSize = Math.min(50, Math.max(1, pageSize));
-  // limit to 50
-
-  // Build cache key from all inputs
-  const cacheKey = generateCacheKey({
-    category,
-    userLat,
-    userLng,
-    maxDistanceKm,
-    sortBy,
-    page: validPage,
-    pageSize: validPageSize,
-  });
-
-  // Check cache
-  const cached = cache.get(cacheKey);
-  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL_MS) {
-    console.log("Cache hit");
-    return cached.data;
+  if (typeof maxDistanceKm !== "number" || maxDistanceKm <= 0) {
+    throw new functions.https.HttpsError(
+        "invalid-argument",
+        "maxDistanceKm must be a positive number.",
+    );
   }
 
-  console.log("Cache miss – executing category");
+  const center = [userLat, userLng];
+  const radiusMeters = maxDistanceKm * 1000;
+  const bounds = geohashQueryBounds(center, radiusMeters);
 
-  // Build Firestore query
-  let firestoreQuery = db.collection("services");
+  let snapshots;
+  try {
+    const queryPromises = bounds.map(([start, end]) => {
+      const q = db.collection("services")
+          .where("status", "==", "approved")
+          .where("category", "==", category)
+          .orderBy("geohash")
+          .startAt(start)
+          .endAt(end);
+      return q.get();
+    });
+    snapshots = await Promise.all(queryPromises);
+  } catch (err) {
+    console.error("Firestore geo query failed:", err);
+    throw new functions.https.HttpsError(
+        "internal",
+        "Search failed. Please try again.",
+    );
+  }
 
-  firestoreQuery = firestoreQuery.where("category", "==", category);
-
-  firestoreQuery = firestoreQuery.where("status", "==", "approved");
-
-
-  // Execute the query (fetch all matching documents)
-  const snapshot = await firestoreQuery.get();
+  const seen = new Set();
   const allResults = [];
 
-  snapshot.forEach((doc) => {
-    const provider = doc.data();
-    const providerLat = provider.latitude;
-    const providerLng = provider.longitude;
+  for (const snapshot of snapshots) {
+    snapshot.forEach((doc) => {
+      if (seen.has(doc.id)) return;
+      seen.add(doc.id);
 
-    if (providerLat == null || providerLng == null) return;
+      const provider = doc.data();
+      if (provider.latitude == null || provider.longitude == null) return;
 
-    const distance =
-    calculateDistance(userLat, userLng, providerLat, providerLng);
-    if (distance > maxDistanceKm) return;
+      const distanceKm =
+      distanceBetween(center, [provider.latitude, provider.longitude]);
+      if (distanceKm > maxDistanceKm) return;
 
-
-    allResults.push({
-      id: doc.id,
-      ...provider,
-      distance: distance,
-      distanceText: `${distance.toFixed(1)} km`,
+      allResults.push({
+        id: doc.id,
+        ...provider,
+        distance: distanceKm,
+        distanceText: `${distanceKm.toFixed(1)} km`,
+      });
     });
-  });
+  }
 
-  // Sort all results
   if (sortBy === "distance") {
     allResults.sort((a, b) => a.distance - b.distance);
   } else if (sortBy === "rating") {
     allResults.sort((a, b) => (b.rating || 0) - (a.rating || 0));
   }
 
-  // Paginate
-  const totalCount = allResults.length;
+  const validPage = Math.max(1, page);
+  const validPageSize = Math.min(50, Math.max(1, pageSize));
   const startIndex = (validPage - 1) * validPageSize;
   const paginatedResults =
   allResults.slice(startIndex, startIndex + validPageSize);
 
-  const responseData = {
+  return {
     providers: paginatedResults,
-    totalCount,
+    totalCount: allResults.length,
     page: validPage,
     pageSize: validPageSize,
-    hasMore: startIndex + validPageSize < totalCount,
+    hasMore: startIndex + validPageSize < allResults.length,
   };
-
-  // Store in cache
-  cache.set(cacheKey, {
-    timestamp: Date.now(),
-    data: responseData,
-  });
-
-  return responseData;
 });
 
 
 // function to delete user account on request
-exports.deleteUser = functions.https.onCall(async (context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-        "unauthenticated", "User must be authenticated");
+exports.deleteUser = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "User must be authenticated");
   }
-  const uid = context.auth.uid;
+  const uid = request.auth.uid;
 
-  const db = admin.firestore();
   const batch = db.batch();
 
   // Delete user document

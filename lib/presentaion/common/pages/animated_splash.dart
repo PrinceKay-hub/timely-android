@@ -125,7 +125,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: const Text(
-                  'Your Style, Our Priority',
+                  'Beauty, on time',
                   style: TextStyle(
                     fontSize: 16,
                     color: Colors.white70,

@@ -8,7 +8,7 @@ class ReviewService {
   static const String _lastReviewDateKey = 'last_review_date';
 
   final InAppReview _inAppReview = InAppReview.instance;
-
+  
   // Singleton
   static final ReviewService _instance = ReviewService._internal();
   factory ReviewService() => _instance;

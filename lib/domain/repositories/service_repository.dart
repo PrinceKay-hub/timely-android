@@ -1,7 +1,7 @@
 import 'package:booking/domain/entities/service_entity.dart';
 
 abstract class ServiceRepository {
-  Future<String> createService(ServiceEntity service);
+  Future<String> createService(ServiceEntity service, bool isProvider);
   
   Future<void> updateService(String serviceId, ServiceEntity service);
   
