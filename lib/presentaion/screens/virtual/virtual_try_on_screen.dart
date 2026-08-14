@@ -378,12 +378,29 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     bottom: Radius.circular(20),
                   ),
                 ),
-                child: const Row(
+                child:  Row(
                   children: [
+                     GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Container(
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.arrow_back,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 15,),
                     Text(
                       'Virtual Try-On ✨',
                       style: TextStyle(
-                        fontSize: 24,
+                        fontSize: 17,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),

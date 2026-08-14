@@ -1,7 +1,7 @@
 // lib/presentation/home/widgets/recommended_section.dart
 import 'package:booking/presentaion/common/pages/network_error.dart';
 import 'package:booking/presentaion/provider/cubit/service_data/service_data_cubit.dart';
-import 'package:booking/presentaion/screens/home/cubit/home_cubit.dart';
+import 'package:booking/presentaion/screens/home/cubit_home/home_cubit.dart';
 import 'package:booking/presentaion/screens/home/detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,85 +9,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 
 class RecommendedSection extends StatelessWidget {
-  final Map<String, dynamic> user;
-  const RecommendedSection({super.key, required this.user});
+  const RecommendedSection({super.key, });
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ServiceDataCubit, ServiceDataState>(
       builder: (context, state) {
         if (state is ServiceDataLoading) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondary,
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(15),
-                      topRight: Radius.circular(15),
-                    ),
-                    child: Shimmer.fromColors(
-                      baseColor: Theme.of(context).colorScheme.surface,
-                      highlightColor: Theme.of(context).scaffoldBackgroundColor,
-                      child: Container(
-                        height: 160,
-                        width: double.infinity,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          height: 25,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(5),
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                          ),
-                        ),
-
-                        const SizedBox(height: 8),
-                        Container(
-                          width: 50,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(5),
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          width: 200,
-                          height: 15,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(5),
-                            color: Theme.of(context).scaffoldBackgroundColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+          return Center(child: CircularProgressIndicator(strokeWidth: 2),);
         }
         if (state is ServiceDataLoaded) {
           final services = state.serviceData;
@@ -98,7 +27,8 @@ class RecommendedSection extends StatelessWidget {
             children: [
               const _ViewTypeSwitcher(),
               const SizedBox(height: 10),
-              _ServicesView(services: services, user: user),
+              _ServicesView(services: services,),
+              const SizedBox(height: 40),
             ],
           );
         }
@@ -248,8 +178,7 @@ class _ViewTypeSwitcher extends StatelessWidget {
 
 class _ServicesView extends StatelessWidget {
   final List<dynamic> services;
-  final Map<String, dynamic> user;
-  const _ServicesView({required this.services, required this.user});
+  const _ServicesView({required this.services, });
 
   @override
   Widget build(BuildContext context) {
@@ -258,11 +187,11 @@ class _ServicesView extends StatelessWidget {
       builder: (context, state) {
         switch (state.viewType) {
           case ViewType.tile:
-            return _TileView(services: services, user: user);
+            return _TileView(services: services,);
           case ViewType.grid:
-            return _GridView(services: services, user: user);
+            return _GridView(services: services, );
           case ViewType.list:
-            return _ListView(services: services, user: user);
+            return _ListView(services: services,);
         }
       },
     );
@@ -271,8 +200,7 @@ class _ServicesView extends StatelessWidget {
 
 class _TileView extends StatelessWidget {
   final List<dynamic> services;
-  final Map<String, dynamic> user;
-  const _TileView({required this.services, required this.user});
+  const _TileView({required this.services});
 
   @override
   Widget build(BuildContext context) {
@@ -283,7 +211,7 @@ class _TileView extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       itemBuilder: (context, index) {
         final item = services[index] as Map<String, dynamic>;
-        return _buildTileItem(context, item, user);
+        return _buildTileItem(context, item);
       },
     );
   }
@@ -291,12 +219,11 @@ class _TileView extends StatelessWidget {
   Widget _buildTileItem(
     BuildContext context,
     Map<String, dynamic> item,
-    Map<String, dynamic> user,
   ) {
     var land = item['landmark'];
     var landmark = land != null ? ', $land' : '';
     return GestureDetector(
-      onTap: () => _navigateToDetail(context, item, user),
+      onTap: () => _navigateToDetail(context, item,),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -460,12 +387,12 @@ class _TileView extends StatelessWidget {
   void _navigateToDetail(
     BuildContext context,
     Map<String, dynamic> item,
-    Map<String, dynamic> user,
   ) {
-    Navigator.push(
+    //context.push('/service/${item['id']}');
+   Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DetailScreen(data: item, user: user),
+        builder: (context) => DetailScreen(id: item['id']),
       ),
     );
   }
@@ -473,8 +400,7 @@ class _TileView extends StatelessWidget {
 
 class _GridView extends StatelessWidget {
   final List<dynamic> services;
-  final Map<String, dynamic> user;
-  const _GridView({required this.services, required this.user});
+  const _GridView({required this.services, });
 
   @override
   Widget build(BuildContext context) {
@@ -491,7 +417,7 @@ class _GridView extends StatelessWidget {
       itemCount: services.length,
       itemBuilder: (context, index) {
         final item = services[index] as Map<String, dynamic>;
-        return _buildGridItem(context, item, user);
+        return _buildGridItem(context, item);
       },
     );
   }
@@ -499,10 +425,9 @@ class _GridView extends StatelessWidget {
   Widget _buildGridItem(
     BuildContext context,
     Map<String, dynamic> item,
-    Map<String, dynamic> user,
   ) {
     return GestureDetector(
-      onTap: () => _navigateToDetail(context, item, user),
+      onTap: () => _navigateToDetail(context, item),
       child: Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
@@ -611,12 +536,11 @@ class _GridView extends StatelessWidget {
   void _navigateToDetail(
     BuildContext context,
     Map<String, dynamic> item,
-    Map<String, dynamic> user,
   ) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DetailScreen(data: item, user: user),
+        builder: (context) => DetailScreen(id: item['id']),
       ),
     );
   }
@@ -624,8 +548,7 @@ class _GridView extends StatelessWidget {
 
 class _ListView extends StatelessWidget {
   final List<dynamic> services;
-  final Map<String, dynamic> user;
-  const _ListView({required this.services, required this.user});
+  const _ListView({required this.services});
 
   @override
   Widget build(BuildContext context) {
@@ -636,7 +559,7 @@ class _ListView extends StatelessWidget {
       itemCount: services.length,
       itemBuilder: (context, index) {
         final item = services[index] as Map<String, dynamic>;
-        return _buildListItem(context, item, user);
+        return _buildListItem(context, item);
       },
     );
   }
@@ -644,12 +567,11 @@ class _ListView extends StatelessWidget {
   Widget _buildListItem(
     BuildContext context,
     Map<String, dynamic> item,
-    Map<String, dynamic> user,
   ) {
     var land = item['landmark'];
     var landmark = land != null ? ', $land' : '';
     return GestureDetector(
-      onTap: () => _navigateToDetail(context, item, user),
+      onTap: () => _navigateToDetail(context, item),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -754,12 +676,11 @@ class _ListView extends StatelessWidget {
   void _navigateToDetail(
     BuildContext context,
     Map<String, dynamic> item,
-    Map<String, dynamic> user,
   ) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => DetailScreen(data: item, user: user),
+        builder: (context) => DetailScreen(id: item['id']),
       ),
     );
   }

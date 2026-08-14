@@ -1,6 +1,6 @@
 // lib/presentation/home/widgets/categories_section.dart
-import 'package:booking/presentaion/screens/home/cubit/home_cubit.dart';
-import 'package:booking/presentaion/screens/home/widget/categorySearch.dart';
+import 'package:booking/presentaion/screens/home/cubit_home/home_cubit.dart';
+import 'package:booking/presentaion/screens/search/categorySearch.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';

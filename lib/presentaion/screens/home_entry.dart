@@ -1,9 +1,8 @@
-// ignore_for_file: public_member_api_docs, sort_constructors_first
-import 'package:booking/core/services/review_service.dart';
+
 import 'package:booking/domain/entities/user_entity.dart';
 import 'package:booking/presentaion/common/pages/loading_screen.dart';
 import 'package:booking/presentaion/screens/favorite/favorite_screen.dart';
-import 'package:booking/presentaion/screens/virtual/virtual_try_on_screen.dart';
+import 'package:booking/presentaion/screens/virtual/try_on.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -49,7 +48,6 @@ class _HomeEntryState extends State<HomeEntry> {
   @override
   void initState() {
     super.initState();
-    ReviewService().onAppStart();
     fetchHomeData();
   }
 
@@ -59,40 +57,38 @@ class _HomeEntryState extends State<HomeEntry> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: BlocBuilder<UserCubit, UserState>(
-        builder: (context, state) {
-          if (state is UserLoading) {
-            return LoadingScreen();
-          }
-      
-          if (state is UserError) {
-            return Scaffold(
-              body: Center(child: Text('Error loading user: ${state.message}')),
-            );
-          }
-      
-          if (state is UserLoaded) {
-            return Scaffold(
-              extendBody: true,
-              body: Padding(
-                padding: const EdgeInsets.only(bottom: 80),
-                child: buildAppBodyContent(currentContentIndex, state.user),
-              ),
-              bottomNavigationBar: _ModernBottomNav(
-                currentIndex: currentContentIndex,
-                items: _navItems,
-                onTap: (index) => setState(() => currentContentIndex = index),
-              ),
-            );
-          }
-      
-          // Default fallback UI
+    return BlocBuilder<UserCubit, UserState>(
+      builder: (context, state) {
+        if (state is UserLoading) {
+          return LoadingScreen();
+        }
+    
+        if (state is UserError) {
           return Scaffold(
-            body: Center(child: Text('No user data available')),
+            body: Center(child: Text('Error loading user: ${state.message}')),
           );
-        },
-      ),
+        }
+    
+        if (state is UserLoaded) {
+          return Scaffold(
+            extendBody: true,
+            body: Padding(
+              padding: const EdgeInsets.only(bottom: 80),
+              child: buildAppBodyContent(currentContentIndex, state.user),
+            ),
+            bottomNavigationBar: _ModernBottomNav(
+              currentIndex: currentContentIndex,
+              items: _navItems,
+              onTap: (index) => setState(() => currentContentIndex = index),
+            ),
+          );
+        }
+    
+        // Default fallback UI
+        return Scaffold(
+          body: Center(child: Text('No user data available')),
+        );
+      },
     );
   }
 
@@ -104,7 +100,7 @@ class _HomeEntryState extends State<HomeEntry> {
         return FavoriteScreen(user: user);
 
       case 2:
-        return VirtualTryOnScreen();
+        return TryOnScreen();
 
       case 3:
         return AppointmentsScreen(user: user);
@@ -141,103 +137,105 @@ class _ModernBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 92,
-      child: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.bottomCenter,
-        children: [
-          // Bar background
-          Container(
-            height: 72,
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              borderRadius: BorderRadius.circular(28),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 12,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+    return SafeArea(
+      child: SizedBox(
+        height: 92,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.bottomCenter,
+          children: [
+            // Bar background
+            Container(
+              height: 72,
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 12,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(items.length, (index) {
+                  if (index == _tryOnIndex) {
+                    // Reserve space for the floating button.
+                    return const SizedBox(width: 64);
+                  }
+                  return _NavIcon(
+                    data: items[index],
+                    selected: currentIndex == index,
+                    onTap: () => onTap(index),
+                  );
+                }),
+              ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: List.generate(items.length, (index) {
-                if (index == _tryOnIndex) {
-                  // Reserve space for the floating button.
-                  return const SizedBox(width: 64);
-                }
-                return _NavIcon(
-                  data: items[index],
-                  selected: currentIndex == index,
-                  onTap: () => onTap(index),
-                );
-              }),
-            ),
-          ),
-
-          // Floating "Try on" button
-          Positioned(
-            bottom: 30,
-            child: GestureDetector(
-              onTap: () => onTap(_tryOnIndex),
-              child: AnimatedScale(
-                scale: currentIndex == _tryOnIndex ? 1.08 : 1.0,
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            _NavColors.primaryStart,
-                            _NavColors.primaryEnd,
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _NavColors.accentGlow.withOpacity(
-                              currentIndex == _tryOnIndex ? 0.45 : 0.2,
-                            ),
-                            blurRadius: currentIndex == _tryOnIndex ? 18 : 14,
-                            spreadRadius: currentIndex == _tryOnIndex ? 1.5 : 0,
+      
+            // Floating "Try on" button
+            Positioned(
+              bottom: 30,
+              child: GestureDetector(
+                onTap: () => onTap(_tryOnIndex),
+                child: AnimatedScale(
+                  scale: currentIndex == _tryOnIndex ? 1.08 : 1.0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              _NavColors.primaryStart,
+                              _NavColors.primaryEnd,
+                            ],
                           ),
-                        ],
-                        border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _NavColors.accentGlow.withOpacity(
+                                currentIndex == _tryOnIndex ? 0.45 : 0.2,
+                              ),
+                              blurRadius: currentIndex == _tryOnIndex ? 18 : 14,
+                              spreadRadius: currentIndex == _tryOnIndex ? 1.5 : 0,
+                            ),
+                          ],
+                          border: Border.all(color: Colors.white, width: 3),
+                        ),
+                        child: const Icon(
+                          FontAwesomeIcons.wandMagicSparkles,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
-                      child: const Icon(
-                        FontAwesomeIcons.wandMagicSparkles,
-                        color: Colors.white,
-                        size: 22,
+                      const SizedBox(height: 4),
+                      Text(
+                        'Try on',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: currentIndex == _tryOnIndex
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: _NavColors.active,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Try on',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: currentIndex == _tryOnIndex
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: _NavColors.active,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

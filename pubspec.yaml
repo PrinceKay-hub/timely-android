@@ -41,6 +41,7 @@ dependencies:
   google_sign_in: ^7.2.0
   firebase_database:
   firebase_analytics:
+  firebase_crashlytics:
   flutter_local_notifications:
   firebase_messaging:
   timezone:
@@ -69,10 +70,9 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   flutter_dotenv: ^6.0.0
-  upgrader: ^12.5.0
+  upgrader: ^13.6.0
   connectivity_plus: ^7.0.0
   device_info_plus: ^12.4.0
-  in_app_review: ^2.0.12
 
 dev_dependencies:
   flutter_test:

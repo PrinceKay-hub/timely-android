@@ -20,4 +20,5 @@ class ServiceDetailCubit extends Cubit<ServiceDetailState> {
       emit(ServiceDetailError('Failed to get service data'));
     }
   }
+  
 }

@@ -1,4 +1,5 @@
 
+import 'package:booking/core/services/save_token.dart';
 import 'package:booking/presentaion/auth/cubit/auth_cubit.dart';
 import 'package:booking/presentaion/auth/cubit/auth_state.dart';
 import 'package:booking/presentaion/auth/pages/auth_wrapper.dart';
@@ -21,6 +22,7 @@ class AppWrapper extends StatelessWidget {
 
           context.read<PresenceCubit>().startOwnPresence(user.id);
           context.read<ChatCubit>().subscribeToChats(user.id);
+          SaveToken().saveFCMToken(user.id);
           
           return HomeEntry(user: user);
         }
@@ -30,6 +32,8 @@ class AppWrapper extends StatelessWidget {
 
           context.read<PresenceCubit>().startOwnPresence(user.id);
           context.read<ChatCubit>().subscribeToChats(user.id);
+          SaveToken().saveFCMToken(user.id);
+          
           return HomeEntry(user: authState.user);
         }
 

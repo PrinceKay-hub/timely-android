@@ -131,6 +131,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen>
                         ],
                       ),
                     ),
+                    SizedBox(height: 60),
                   ],
                 ),
                 if (_isLoadingDirections)

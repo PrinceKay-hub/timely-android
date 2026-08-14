@@ -10,7 +10,6 @@ import 'package:booking/presentaion/screens/appointments/appointments_screen.dar
 import 'package:booking/presentaion/screens/favorite/favorite_screen.dart';
 import 'package:booking/presentaion/screens/home/detail_screen.dart';
 import 'package:booking/presentaion/screens/home/home_screen.dart';
-import 'package:booking/presentaion/screens/home/service_detail.dart';
 import 'package:booking/presentaion/screens/home_entry.dart';
 import 'package:booking/presentaion/screens/profile/profile_screen.dart';
 import 'package:booking/routes/app_wrapper.dart';
@@ -88,13 +87,7 @@ class AppRouter {
           builder: (context, state) => AnimatedSplashScreen(),
         ),
         GoRoute(path: '/home-entry', builder: (context, state) => HomeEntry()),
-        GoRoute(
-          path: '/service/:id',
-          builder: (context, state) {
-            final serviceId = state.pathParameters['id']!;
-            return ServiceDetail(id: serviceId);
-          },
-        ),
+      
         GoRoute(
           path: '/app',
           builder: (context, state) {
@@ -139,22 +132,32 @@ class AppRouter {
           builder: (context, state) =>
               ProfileScreen(user: state.extra as Map<String, dynamic>),
         ),
+        // FIX: pageBuilder + explicit key tied to the :id param. Without
+        // this, a GoRouter-triggered rebuild (e.g. from refreshListenable
+        // firing on a duplicate auth emission) can cause Flutter to treat
+        // the rebuilt route as a brand-new page in the same slot, disposing
+        // the old DetailScreen State and creating a fresh one — which
+        // re-runs initState(), re-triggers one-shot fetches, and resets
+        // scroll position, tab selection, and other in-page state.
         GoRoute(
-          path: '/detail-screen',
-          name: '/detail-screen',
-          pageBuilder: (context, state) => NoTransitionPage(
-            child: DetailScreen(
-              data: state.extra as Map<String, dynamic>,
-              user: state.extra as Map<String, dynamic>,
-            ),
-          ),
+          path: '/service/:id',
+          pageBuilder: (context, state) {
+            final serviceId = state.pathParameters['id']!;
+            return NoTransitionPage(
+              key: ValueKey('service_page_$serviceId'),
+              child: DetailScreen(
+                key: ValueKey('detail_screen_$serviceId'),
+                id: serviceId,
+              ),
+            );
+          },
         ),
         GoRoute(
-          path: '/booking',
-          builder: (context, state) => BookingScreen(
-            data: state.extra as Map<String, dynamic>,
-            user: state.extra as Map<String, dynamic>,
-          ),
+          path: '/booking/:id',
+          builder: (context, state) {
+            final bookingId = state.pathParameters['id']!;
+            return BookingScreen(id: bookingId);
+          }
         ),
         GoRoute(
           path: '/chat/:id',

@@ -1,6 +1,5 @@
-// lib/presentation/home/widgets/special_offers_card.dart
+
 import 'package:booking/presentaion/provider/pages/registration_screen.dart';
-//import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 
 class SpecialOffersCard extends StatelessWidget {
@@ -539,33 +538,6 @@ class SpecialOffersCard extends StatelessWidget {
                       const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () async {
-                          /* try {
-                            await seedHairstyles();
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('✅ Seeded successfully!'),
-                              ),
-                            );
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('❌ Error: $e')),
-                            );
-                          }
-                          try {
-                            if (user['isProvider'] == true) {
-                              await FirebaseAnalytics.instance.logEvent(
-                                name: 'provider_signup_complete',
-                                parameters: {
-                                  'provider_id': '123456789',
-                                  'service_id': '9874563214563',
-                                  'method': 'app',
-                                },
-                              );
-                              print('logged');
-                            }
-                          } catch (e) {
-                            print(e.toString());
-                          }*/
 
                             if (user['isEmailVerified'] == false) {
                             ScaffoldMessenger.of(context).showSnackBar(

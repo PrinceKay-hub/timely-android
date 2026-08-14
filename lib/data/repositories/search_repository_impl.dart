@@ -1,4 +1,5 @@
 // lib/repositories/search_repository_impl.dart
+import 'package:booking/core/utils/error_mapper.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/search_response.dart';
@@ -6,7 +7,6 @@ import '../models/search_response.dart';
 class SearchRepositoryImpl {
   final FirebaseFunctions _functions = FirebaseFunctions.instance;
 
-  // Location cache
   Position? _cachedUserPosition;
   DateTime? _lastLocationUpdate;
   static const Duration _locationCacheDuration = Duration(minutes: 5);
@@ -23,26 +23,33 @@ class SearchRepositoryImpl {
       return _cachedUserPosition!;
     }
 
-    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      throw Exception('Location services are disabled.');
-    }
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        throw Exception('Location permission is required to search nearby services.');
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw const LocationServiceDisabledException();
       }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw const LocationPermissionDenied();
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw const LocationPermissionDeniedForever();
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      _cachedUserPosition = position;
+      _lastLocationUpdate = now;
+      return position;
+    } catch (e) {
+      throw mapLocationError(e);
     }
-
-    final position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-
-    _cachedUserPosition = position;
-    _lastLocationUpdate = now;
-    return position;
   }
 
   // ─── Search methods ─────────────────────────────────────────────────────
@@ -74,8 +81,7 @@ class SearchRepositoryImpl {
 
       return SearchResponse.fromMap(result.data as Map<String, dynamic>);
     } catch (e) {
-      print('Search error: $e');
-      rethrow;
+      throw mapSearchError(e);
     }
   }
 
@@ -102,12 +108,10 @@ class SearchRepositoryImpl {
 
       return SearchResponse.fromMap(result.data as Map<String, dynamic>);
     } catch (e) {
-      print('Search by category error: $e');
-      rethrow;
+      throw mapSearchError(e);
     }
   }
 
-  // Optional: helper to clear location cache
   void clearLocationCache() {
     _cachedUserPosition = null;
     _lastLocationUpdate = null;

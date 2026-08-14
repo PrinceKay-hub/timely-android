@@ -65,10 +65,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => DetailScreen(
-              data: service,
-              user: widget.user,
-            ),
+            builder: (context) => DetailScreen(id: service['id']),
           ),
         );
       },

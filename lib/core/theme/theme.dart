@@ -1,3 +1,5 @@
+import 'dart:ui';
+import 'package:booking/presentaion/screens/virtual/widgets/app_colors.dart';
 import 'package:flutter/material.dart';
 
 enum AppTheme { light, dark, system }
@@ -17,6 +19,7 @@ class AppThemes {
       onSurface: Color(0xFF111827),
       onError: Colors.white,
     ),
+    extensions: const [AppColors.light],
     appBarTheme: const AppBarTheme(
       elevation: 0,
       backgroundColor: Colors.white,
@@ -172,6 +175,7 @@ class AppThemes {
       onSurface: Colors.white,
       onError: Colors.black,
     ),
+    extensions: const [AppColors.dark],
     appBarTheme: const AppBarTheme(
       elevation: 0,
       backgroundColor: Color(0xFF1F2937),
@@ -332,7 +336,7 @@ class AppThemes {
       case AppTheme.dark:
         return darkTheme;
       case AppTheme.system:
-        final brightness = WidgetsBinding.instance.window.platformBrightness;
+        final brightness = PlatformDispatcher.instance.platformBrightness;
         return brightness == Brightness.dark ? darkTheme : lightTheme;
     }
   }

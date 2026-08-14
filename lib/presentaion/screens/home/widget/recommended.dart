@@ -48,10 +48,7 @@ class Recommended extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => DetailScreen(
-                      data: data[index],
-                      user: user,
-                    ),
+                    builder: (context) => DetailScreen(id: item['id']),
                   ),
                 );
               },

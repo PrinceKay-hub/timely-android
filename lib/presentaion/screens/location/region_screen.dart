@@ -443,6 +443,7 @@ class _RegionsScreenState extends State<RegionsScreen>
                                 },
                               ),
                       ),
+                      SizedBox(height: 60,)
                     ],
                   ),
 
@@ -814,6 +815,7 @@ class _RegionsScreenState extends State<RegionsScreen>
                                     ),
                                   ),
                                 ),
+                                SizedBox(height: 60,)
                             ],
                           ),
                         ),

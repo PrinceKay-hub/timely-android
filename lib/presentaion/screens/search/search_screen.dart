@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 // Search Screen with Autocomplete
 class SearchScreen extends StatefulWidget {
@@ -26,7 +25,6 @@ class _SearchScreenState extends State<SearchScreen> {
   List<String> _suggestions = [];
   Timer? _debounceTimer;
   var location;
-  
 
   final List<String> _recentSearches = [
     'Haircut',
@@ -76,7 +74,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _performSearch(String query) {
-    // Simulate API call - Replace with actual API
+    
     final results = serviceList
         .where((service) => service.toLowerCase().contains(query.toLowerCase()))
         .take(5)
@@ -97,7 +95,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _navigateToLocation() {
-   Navigator.push(
+    Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const RegionsScreen()),
     );
@@ -110,7 +108,9 @@ class _SearchScreenState extends State<SearchScreen> {
           content: Text('Please enter a search term'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -121,7 +121,9 @@ class _SearchScreenState extends State<SearchScreen> {
           content: Text('Please select location'),
           backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       );
       return;
@@ -134,7 +136,7 @@ class _SearchScreenState extends State<SearchScreen> {
         builder: (context) => SearchResultsScreen(
           query: _searchController.text,
           location: location,
-          user: widget.user
+          user: widget.user,
         ),
       ),
     );
@@ -142,10 +144,9 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<List<String>> fetchServices() async {
     try {
-      
       DocumentSnapshot doc = await FirebaseFirestore.instance
           .collection('categories')
-          .doc('serviceList') 
+          .doc('serviceList')
           .get();
 
       if (doc.exists) {
@@ -200,119 +201,143 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               child: Column(
                 children: [
-                  SizedBox(height: 20,),
+                  SizedBox(height: 20),
                   // Search Bar
                   Row(
                     children: [
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: Padding(
-                          padding: const EdgeInsets.all(8.0),
+                          padding: const EdgeInsets.all(4.0),
                           child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.arrow_back,
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary,
+                              color: Colors.white,
+                              size: 20,
                             ),
                           ),
                         ),
                       ),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          focusNode: _searchFocusNode,
-                          decoration: InputDecoration(
-                            contentPadding: EdgeInsets.symmetric(horizontal: 10),
-                            hintText: 'What service are you looking for?',
-                            hintStyle: TextStyle(
-                              fontSize: 14
-                            ),
-                            suffixIcon: _searchController.text.isNotEmpty
-                                ? IconButton(
-                                    icon: const Icon(
-                                      Icons.clear,
-                                      color: Colors.grey,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.search,
+                                size: 18,
+                                color: Colors.white70,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _searchController,
+                                  focusNode: _searchFocusNode,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                  ),
+                                  cursorColor: Colors.white,
+                                  decoration: const InputDecoration(
+                                    isCollapsed: true,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      vertical: 12,
                                     ),
-                                    onPressed: _clearSearch,
-                                  )
-                                : null,
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(50),
-                              borderSide: BorderSide.none,
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(50),
-                              borderSide: BorderSide.none,
-                            ),
-                            filled: true,
-                            fillColor: Theme.of(context).colorScheme.surface,
+                                    border: InputBorder.none,
+                                    fillColor: Colors.transparent,
+                                    focusedBorder: OutlineInputBorder(
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    enabledBorder: OutlineInputBorder(borderSide: BorderSide.none),
+                                    hintText:
+                                        'Search for a service',
+                                    hintStyle: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_searchController.text.isNotEmpty)
+                                GestureDetector(
+                                  onTap: _clearSearch,
+                                  child: const Icon(
+                                    Icons.close,
+                                    size: 18,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ),
-                      Container(
-                        width: 8,
-                        height: 7,
-                        color: Color(0xFF8B5CF6),
-                      ),
+                      const SizedBox(width: 8),
                       GestureDetector(
                         onTap: _performFullSearch,
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Color(0xFF8B5CF6),
+                            color: Colors.white.withOpacity(0.2),
                             shape: BoxShape.circle,
                           ),
-                          child: FaIcon(
-                              FontAwesomeIcons.magnifyingGlass,
-                              color: Colors.white,
-                              size: 20,
-                              ),
+                          child: const Icon(
+                            Icons.search,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 12),
-      
+
                   // Location Selector
                   GestureDetector(
                     onTap: _navigateToLocation,
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(15),
-                      ),
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 46),
                       child: Row(
                         children: [
-                          Icon(
-                            Icons.location_on,
-                            color: Theme.of(context).colorScheme.primary,
+                          const Icon(
+                            Icons.location_on_outlined,
+                            size: 14,
+                            color: Colors.white70,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: BlocBuilder<SetLocationCubit, SetLocationState>(
-                              builder: (context, state) {
-                                location = state.value;
-                                return Text(
-                                  location,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                );
-                              },
-                            ),
+                          const SizedBox(width: 6),
+                          BlocBuilder<SetLocationCubit, SetLocationState>(
+                            builder: (context, state) {
+                              location = state.value;
+                              return Text(
+                                location,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              );
+                            },
                           ),
-                          const Icon(Icons.chevron_right, color: Colors.grey),
+                          const Icon(
+                            Icons.chevron_right,
+                            color: Colors.white70,
+                            size: 14,
+                          ),
                         ],
                       ),
                     ),
@@ -320,7 +345,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ],
               ),
             ),
-      
+
             // Content Area
             Expanded(
               child: Stack(
@@ -409,7 +434,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         ],
                       ),
                     ),
-      
+
                   // Autocomplete Suggestions
                   if (_showAutocomplete && _suggestions.isNotEmpty)
                     Container(

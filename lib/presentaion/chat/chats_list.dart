@@ -43,64 +43,63 @@ class _ChatsListState extends State<ChatsList> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: Scaffold(
-        appBar: AppBar(
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            leading: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_back,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+    return Scaffold(
+      appBar: AppBar(
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          leading: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
                 ),
-              ),
-            ),
-            title: Text(
-              'Chat',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+                child: Icon(
+                  Icons.arrow_back,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
             ),
           ),
-        body: BlocBuilder<ChatCubit, ChatState>(
-          builder: (context, state) {
-            if (state.chatsLoading && state.chats.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (state.chats.isEmpty) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('💬', style: TextStyle(fontSize: 40)),
-                    SizedBox(height: 12),
-                    Text('No conversations yet',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 6),
-                    Text('Messages with your bookings will show up here'),
-                  ],
-                ),
-              );
-            }
-            return ListView.builder(
-              itemCount: state.chats.length,
-              itemBuilder: (context, index) {
-                final chat = state.chats[index];
-                return _ChatRow(chat: chat);
-              },
-            );
-          },
+          title: Text(
+            'Chats',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
         ),
+      body: BlocBuilder<ChatCubit, ChatState>(
+        builder: (context, state) {
+          if (state.chatsLoading && state.chats.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (state.chats.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('💬', style: TextStyle(fontSize: 40)),
+                  SizedBox(height: 12),
+                  Text('No conversations yet',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 6),
+                  Text('Messages with your bookings will show up here'),
+                ],
+              ),
+            );
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.only(bottom: 20),
+            itemCount: state.chats.length,
+            itemBuilder: (context, index) {
+              final chat = state.chats[index];
+              return _ChatRow(chat: chat);
+            },
+          );
+        },
       ),
     );
   }

@@ -52,7 +52,7 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     _chatCubit.unsubscribeMessages(
       widget.chatId,
-    ); // ✅ safe, cubit is still alive
+    ); 
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -92,97 +92,97 @@ class _ChatScreenState extends State<ChatScreen> {
           currentFocus.unfocus();
         }
       },
-      child: SafeArea(
-        child: Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.secondary,
-          appBar: AppBar(
-            backgroundColor: colorScheme.primary,
-            foregroundColor: Colors.white,
-            leading: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.arrow_back,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.secondary,
+        appBar: AppBar(
+          backgroundColor: colorScheme.primary,
+          foregroundColor: Colors.white,
+          leading: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.arrow_back,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
-            title: ChatHeader(chatId: widget.chatId),
           ),
-          body: ChatDotBackground(
-            child: BlocListener<ChatCubit, ChatState>(
-              listener: (context, state) {
-                final messages = state.messagesByChat[widget.chatId];
-                if (messages == null || messages.isEmpty) return;
-            
-                final lastMsg = messages.last;
-                final authState = context.read<AuthCubit>().state;
-                if (authState is! AuthAuthenticated) return;
-            
-                // Only react to messages from the other user
-                if (lastMsg.senderId == authState.user.id) return;
-            
-                final msgTime = lastMsg.createdAt;
-                if (msgTime == null) return;
-            
-                // If this message is newer than the last one we marked read, mark read
-                if (_lastMarkedReadAt == null ||
-                    msgTime.isAfter(_lastMarkedReadAt!)) {
-                  context.read<ChatCubit>().markChatRead(
-                    widget.chatId,
-                    authState.user.id,
-                  );
-                  _lastMarkedReadAt = msgTime;
+          title: ChatHeader(chatId: widget.chatId),
+        ),
+        body: ChatDotBackground(
+          child: BlocListener<ChatCubit, ChatState>(
+            listener: (context, state) {
+              final messages = state.messagesByChat[widget.chatId];
+              if (messages == null || messages.isEmpty) return;
+      
+              final lastMsg = messages.last;
+              final authState = context.read<AuthCubit>().state;
+              if (authState is! AuthAuthenticated) return;
+      
+              // Only react to messages from the other user
+              if (lastMsg.senderId == authState.user.id) return;
+      
+              final msgTime = lastMsg.createdAt;
+              if (msgTime == null) return;
+      
+              // If this message is newer than the last one we marked read, mark read
+              if (_lastMarkedReadAt == null ||
+                  msgTime.isAfter(_lastMarkedReadAt!)) {
+                context.read<ChatCubit>().markChatRead(
+                  widget.chatId,
+                  authState.user.id,
+                );
+                _lastMarkedReadAt = msgTime;
+              }
+            },
+            child: BlocBuilder<ChatCubit, ChatState>(
+              builder: (context, state) {
+                final messages = state.messagesByChat[widget.chatId] ?? [];
+                final loading = state.messagesLoading[widget.chatId] ?? false;
+                if (loading && messages.isEmpty) {
+                  return const Center(child: CircularProgressIndicator());
                 }
-              },
-              child: BlocBuilder<ChatCubit, ChatState>(
-                builder: (context, state) {
-                  final messages = state.messagesByChat[widget.chatId] ?? [];
-                  final loading = state.messagesLoading[widget.chatId] ?? false;
-                  if (loading && messages.isEmpty) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  // Reverse for display (newest at bottom)
-                  final groupedItems = _buildGroupedMessages(messages);
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          reverse: true,
-                          itemCount: groupedItems.length,
-                          itemBuilder: (context, index) {
-                            // Because reverse is true, we need to access items from the end
-                            final item =
-                                groupedItems[groupedItems.length - 1 - index];
-                            if (item is DateTime) {
-                              return DateHeader(date: item);
-                            } else {
-                              return MessageBubble(
-                                message: item as ChatMessage,
-                                chatId: widget.chatId,
-                              );
-                            }
-                          },
-                        ),
+                // Reverse for display (newest at bottom)
+                final groupedItems = _buildGroupedMessages(messages);
+                return Column(
+                  children: [
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        reverse: true,
+                        itemCount: groupedItems.length,
+                        itemBuilder: (context, index) {
+                          // Because reverse is true, we need to access items from the end
+                          final item =
+                              groupedItems[groupedItems.length - 1 - index];
+                          if (item is DateTime) {
+                            return DateHeader(date: item);
+                          } else {
+                            return MessageBubble(
+                              message: item as ChatMessage,
+                              chatId: widget.chatId,
+                            );
+                          }
+                        },
                       ),
-                      MessageInput(
+                    ),
+                    SafeArea(
+                      child: MessageInput(
                         controller: _textController,
                         onSend: () {
                           _sendMessage();
                         },
                       ),
-                    ],
-                  );
-                },
-              ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),

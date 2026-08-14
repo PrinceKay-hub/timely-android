@@ -39,8 +39,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = 20
-        versionName = "3.6.1"
+        versionCode = 23
+        versionName = "3.7.7"
     }
 
     signingConfigs {
@@ -55,9 +55,12 @@ android {
     buildTypes {
     release {
         signingConfig = signingConfigs.getByName("release")
-        optimization {
-            enable = true
-        }
+        isMinifyEnabled = true
+        isShrinkResources = true
+        proguardFiles(
+            getDefaultProguardFile("proguard-android-optimize.txt"),
+            "proguard-rules.pro"
+        )
     }
 }
 }

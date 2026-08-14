@@ -8,11 +8,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 class PortfolioViewerScreen extends StatefulWidget {
   final String serviceId;
+  final String providerId;
+  final String userName;
   final int initialIndex;
 
   const PortfolioViewerScreen({
     Key? key,
     required this.serviceId,
+    required this.providerId,
+    required this.userName,
     this.initialIndex = 0,
   }) : super(key: key);
 
@@ -203,7 +207,7 @@ class _PortfolioViewerScreenState extends State<PortfolioViewerScreen> {
                     onTap: () {
                       context
                           .read<PortfolioCubit>()
-                          .toggleLike(widget.serviceId, item.id);
+                          .toggleLike(widget.serviceId, item.id, widget.providerId, widget.userName);
                     },
                   ),
                   const SizedBox(height: 24),

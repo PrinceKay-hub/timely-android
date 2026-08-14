@@ -1,4 +1,5 @@
 // Login Screen
+import 'package:booking/core/services/save_token.dart';
 import 'package:booking/presentaion/auth/cubit/auth_cubit.dart';
 import 'package:booking/presentaion/auth/cubit/auth_state.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -34,7 +35,7 @@ class _AuthLoginState extends State<AuthLogin> {
   void _handleLogin() {
     if (_formKey.currentState!.validate()) {
       // Perform login logic
-     context.read<AuthCubit>().signInWithEmail(
+      context.read<AuthCubit>().signInWithEmail(
         _emailController.text,
         _passwordController.text,
       );
@@ -48,9 +49,11 @@ class _AuthLoginState extends State<AuthLogin> {
 
   void _passwordReset() async {
     try {
-        if(emailController.text.isNotEmpty) {
-          await FirebaseAuth.instance.sendPasswordResetEmail(email: emailController.text.trim());
-        }
+      if (emailController.text.isNotEmpty) {
+        await FirebaseAuth.instance.sendPasswordResetEmail(
+          email: emailController.text.trim(),
+        );
+      }
     } on FirebaseAuthException catch (e) {
       SnackBar(
         content: Text(e.message.toString()),
@@ -78,39 +81,31 @@ class _AuthLoginState extends State<AuthLogin> {
                 content: Text(state.message),
                 backgroundColor: Theme.of(context).colorScheme.error,
                 behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             );
           }
           if (state is AuthAuthenticated) {
+            final user = state.user;
             final destination = (widget.from != null && widget.from!.isNotEmpty)
                 ? widget.from!
                 : '/home-entry';
             context.go(destination);
-            print(destination);
+            SaveToken().saveFCMToken(user.id);
           }
 
           if (state is AuthAuthenticatedGoog) {
-            
+            final user = state.user;
             final destination = (widget.from != null && widget.from!.isNotEmpty)
                 ? widget.from!
                 : '/home-entry';
             context.go(destination);
-          print(destination);
+            SaveToken().saveFCMToken(user.id);
           }
         },
         builder: (context, state) {
-          if (state is AuthLoading || state is AuthLoadingGoog) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(strokeWidth: 2,),
-                    SizedBox(height: 10,),
-                    Text('Signing in...')
-                  ],
-                ));
-            }
           return SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -215,7 +210,9 @@ class _AuthLoginState extends State<AuthLogin> {
                                   ),
                                 ),
                                 filled: true,
-                                fillColor: Theme.of(context).colorScheme.secondary,
+                                fillColor: Theme.of(
+                                  context,
+                                ).colorScheme.secondary,
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
@@ -286,7 +283,9 @@ class _AuthLoginState extends State<AuthLogin> {
                                   ),
                                 ),
                                 filled: true,
-                                fillColor: Theme.of(context).colorScheme.secondary,
+                                fillColor: Theme.of(
+                                  context,
+                                ).colorScheme.secondary,
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
@@ -352,30 +351,63 @@ class _AuthLoginState extends State<AuthLogin> {
                             const SizedBox(height: 24),
 
                             // Login Button
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton(
-                                onPressed: _handleLogin,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF8B5CF6),
+                            if (state is AuthLoading ||
+                                state is AuthLoadingGoog)
+                              SizedBox(
+                                width: double.infinity,
+                                child: Container(
                                   padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
+                                    vertical: 8,
                                   ),
-                                  shape: RoundedRectangleBorder(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF8B5CF6),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  elevation: 0,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'Signing in...',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                child: const Text(
-                                  'Sign In',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                              )
+                            else
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: _handleLogin,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF8B5CF6),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    elevation: 0,
+                                  ),
+                                  child: Text(
+                                    'Sign In',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -415,7 +447,7 @@ class _AuthLoginState extends State<AuthLogin> {
                           height: 24,
                           width: 24,
                         ),
-                        label:  Text(
+                        label: Text(
                           'Continue with Google',
                           style: TextStyle(
                             fontSize: 16,
@@ -426,7 +458,9 @@ class _AuthLoginState extends State<AuthLogin> {
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           side: BorderSide(color: Colors.grey[300]!),
-                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surface,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -474,8 +508,6 @@ class _AuthLoginState extends State<AuthLogin> {
   }
 
   void _showForgotPasswordDialog() {
-    
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

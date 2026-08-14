@@ -10,6 +10,7 @@ import 'package:booking/presentaion/screens/profile/policy.dart';
 import 'package:booking/presentaion/screens/profile/terms.dart';
 import 'package:booking/presentaion/screens/profile/try_on_history.dart';
 import 'package:booking/presentaion/theme/cubit/theme_cubit.dart';
+import 'package:booking/presentaion/user/cubit/user_cubit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -464,7 +465,7 @@ final isProvider = parseBool(widget.user['isProvider']);
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 60),
                 ],
               ),
             ),

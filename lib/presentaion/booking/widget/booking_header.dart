@@ -2,19 +2,23 @@ import 'package:booking/presentaion/booking/cubit/booking_form_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
 
 class BookingHeader extends StatelessWidget {
-  const BookingHeader({super.key});
+  final String serviceId;
+  const BookingHeader({super.key, required this.serviceId});
 
   @override
   Widget build(BuildContext context) {
     final providerData = context.select((BookingFormCubit cubit) => cubit.providerData);
-
+    final landmark = providerData['landmark'] != null
+                  ? ', ${providerData['landmark']}'
+                  : '';
     return Column(
       children: [
         Container(
           padding: const EdgeInsets.all(20),
-          height: 100,
+          height: 120,
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.primary,
             borderRadius: const BorderRadius.only(
@@ -24,7 +28,7 @@ class BookingHeader extends StatelessWidget {
           ),
           child: Column(
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -49,9 +53,12 @@ class BookingHeader extends StatelessWidget {
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
-                      Icons.more_horiz,
-                      color: Theme.of(context).colorScheme.primary,
+                    child: GestureDetector(
+                      onTap: () => _showSortOptions(context, serviceId: serviceId),
+                      child: Icon(
+                        Icons.more_horiz,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
                     ),
                   ),
                 ],
@@ -88,6 +95,8 @@ class BookingHeader extends StatelessWidget {
                     children: [
                       Text(
                         providerData['name'] ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                       const SizedBox(height: 4),
@@ -97,7 +106,7 @@ class BookingHeader extends StatelessWidget {
                           const SizedBox(width: 4),
                           Expanded(
                             child: Text(
-                              providerData['location'] ?? '',
+                              '${providerData['district']}$landmark',
                               style: const TextStyle(color: Colors.grey, fontSize: 12),
                             ),
                           ),
@@ -127,6 +136,51 @@ class BookingHeader extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+void shareProviderLink(String serviceId) {
+      final deepLink = 'https://timelygh.com/booking/$serviceId';
+      SharePlus.instance.share(
+        ShareParams(text: 'Check out this booking page: $deepLink'),
+      );
+    }
+  void _showSortOptions(BuildContext context, {String? serviceId}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SafeArea(
+        child: Container(
+          decoration:  BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(30),
+              topRight: Radius.circular(30),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.share),
+                title: const Text('Share Booking Page'),
+                onTap: () {
+                 shareProviderLink(serviceId!);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

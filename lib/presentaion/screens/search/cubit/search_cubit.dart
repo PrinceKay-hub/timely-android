@@ -1,7 +1,7 @@
 // lib/cubits/search_cubit.dart
 import 'package:bloc/bloc.dart';
+import 'package:booking/core/exceptions/app_exception.dart';
 import 'package:booking/data/repositories/search_repository_impl.dart';
-import 'package:equatable/equatable.dart';
 
 part 'search_state.dart';
 
@@ -117,12 +117,8 @@ class SearchCubit extends Cubit<SearchState> {
         hasMore: response.hasMore,
         clearError: true,
       ));
-    } catch (e) {
-      if (requestId != _requestId) return;
-      emit(state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      ));
+    } on AppException catch (e) {
+      emit(state.copyWith(isLoading: false, error: e.message));
     }
   }
 
@@ -177,12 +173,8 @@ class SearchCubit extends Cubit<SearchState> {
         // Should not happen
         emit(state.copyWith(isLoadingMore: false));
       }
-    } catch (e) {
-      if (requestId != _requestId) return;
-      emit(state.copyWith(
-        isLoadingMore: false,
-        error: e.toString(),
-      ));
+    } on AppException catch (e) {
+      emit(state.copyWith(isLoadingMore: false, loadMoreError: e.message));
     }
   }
 

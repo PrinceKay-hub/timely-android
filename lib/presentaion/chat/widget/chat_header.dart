@@ -1,5 +1,6 @@
 import 'package:booking/presentaion/auth/cubit/auth_cubit.dart';
 import 'package:booking/presentaion/auth/cubit/auth_state.dart';
+import 'package:booking/presentaion/booking/booking.dart';
 import 'package:booking/presentaion/chat/cubit_chat/chat_cubit.dart';
 import 'package:booking/presentaion/chat/cubit_presence/presence_cubit.dart';
 import 'package:booking/presentaion/chat/widget/chat_avatar.dart';
@@ -26,13 +27,11 @@ class ChatHeader extends StatelessWidget {
     final otherPhoto = chat.participantPhotos?[otherUid];
     final isProvider = ChatCubit.isProviderInChat(chat, myUid);
     final title = isProvider ? otherName : (chat.serviceName ?? otherName);
+    final serviceId = chat.serviceId;
 
     // Subscribe to presence
     context.read<PresenceCubit>().subscribeToPresence(otherUid);
-    final presence = context
-        .watch<PresenceCubit>()
-        .state
-        .presenceByUid[otherUid];
+    final presence = context.watch<PresenceCubit>().state.presenceByUid[otherUid];
 
     return Row(
       children: [
@@ -50,7 +49,13 @@ class ChatHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               if (presence != null)
                 Text(
                   formatPresenceLabel(presence),
@@ -64,6 +69,23 @@ class ChatHeader extends StatelessWidget {
             ],
           ),
         ),
+        if(!isProvider && serviceId != null)
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => BookingScreen(id: serviceId),
+                ),
+              ); 
+            },
+            child: const Text('Book Now'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              backgroundColor: Colors.white,
+              foregroundColor: Theme.of(context).colorScheme.primary,
+            ),
+          ),
       ],
     );
   }

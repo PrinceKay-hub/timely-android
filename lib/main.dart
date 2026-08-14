@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:booking/core/network/firebase_service.dart';
 import 'package:booking/core/services/firebase_messaging_handler.dart';
 import 'package:booking/core/services/local_notification_service.dart';
@@ -25,7 +27,7 @@ import 'package:booking/presentaion/provider/cubit/service_detail/service_detail
 import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_bloc.dart';
 import 'package:booking/presentaion/review/cubit/review_cubit.dart';
 import 'package:booking/presentaion/screens/favorite/bloc/favorite_bloc.dart';
-import 'package:booking/presentaion/screens/home/cubit/home_cubit.dart';
+import 'package:booking/presentaion/screens/home/cubit_home/home_cubit.dart';
 import 'package:booking/presentaion/screens/location/cubit/cubit/set_location_cubit.dart';
 import 'package:booking/presentaion/screens/location/cubit/location_cubit.dart';
 import 'package:booking/presentaion/screens/search/cubit/search_cubit.dart';
@@ -33,6 +35,7 @@ import 'package:booking/presentaion/theme/cubit/theme_cubit.dart';
 import 'package:booking/presentaion/user/cubit/user_cubit.dart';
 import 'package:booking/routes/app_router.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -77,6 +80,16 @@ void main() async {
   }
 
   await dotenv.load(fileName: ".env");
+
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+   FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
 
   runApp(MyApp(notificationService: notificationService));
 }
@@ -127,7 +140,10 @@ class MyApp extends StatelessWidget {
                   ..checkAuthStatus(),
           ),
           BlocProvider(
-            create: (context) => UserCubit(context.read<UserRepositoryImpl>()),
+            create: (context) => UserCubit(
+              context.read<UserRepositoryImpl>(), 
+              userRepository: context.read<UserRepositoryImpl>(), 
+              authCubit: context.read<AuthCubit>()),
           ),
           BlocProvider(
             create: (context) =>

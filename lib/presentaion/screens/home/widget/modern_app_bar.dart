@@ -25,181 +25,152 @@ class ModernAppBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final greeting = _getTimeBasedGreeting();
-
+    final authState = context.watch<AuthCubit>().state;
     return SliverAppBar(
-      expandedHeight: 90,
-      floating: true,
+      toolbarHeight: 70,
       pinned: true,
       elevation: 0,
+      automaticallyImplyLeading: false, // Prevents back button layout shifts
+      titleSpacing: 0, // Allows container to stretch to the screen edges
       backgroundColor: Colors.transparent,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary,
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(30),
-              bottomRight: Radius.circular(30),
-            ),
-          ),
-          child: Column(
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundColor: Theme.of(context).colorScheme.surface,
-                        child: Text(
-                          user['displayName']?[0] ?? 'U',
-                          style: const TextStyle(
-                            color: Color(0xFF8B5CF6),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 20,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Hello ${user['displayName'] ?? ''},',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            greeting,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      BlocBuilder<ChatCubit, ChatState>(
-                        builder: (context, chatState) {
-                          // Get current user ID
-                          final authState = context.watch<AuthCubit>().state;
-                          if (authState is! AuthAuthenticated) {
-                            return const SizedBox.shrink(); // or hide badge
-                          }
 
-                          final unread = context
-                              .read<ChatCubit>()
-                              .getTotalUnread(authState.user.id);
-                          if (unread == 0) {
-                            // Optionally hide the badge when no unread messages
-                            return GestureDetector(
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const ChatsList(),
-                                  ),
-                                );
-                              },
+      // 1. Move your UI code out of flexibleSpace and into the title property
+      flexibleSpace: Container(
+        padding: const EdgeInsets.only(left: 20, right: 20, top: 50, bottom: 20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: const BorderRadius.only(
+            bottomLeft: Radius.circular(30),
+            bottomRight: Radius.circular(30),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
+                  child: Text(
+                    user['displayName']?[0] ?? 'U',
+                    style: const TextStyle(
+                      color: Color(0xFF8B5CF6),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min, // Prevents layout overflows
+                  children: [
+                    Text(
+                      'Hello ${user['displayName'] ?? ''},',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      greeting,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            Row(
+              children: [
+                BlocBuilder<ChatCubit, ChatState>(
+                  builder: (context, chatState) {
+                    if (authState is! AuthAuthenticated) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final unread = context.read<ChatCubit>().getTotalUnread(
+                      authState.user.id,
+                    );
+
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ChatsList(),
+                          ),
+                        );
+                      },
+                      child: Stack(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF8B5CF6),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const FaIcon(
+                              FontAwesomeIcons.message,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                          if (unread > 0) // Cleaner conditional rendering
+                            Positioned(
+                              right: 0,
+                              top: 0,
                               child: Container(
-                                padding: const EdgeInsets.all(12),
+                                padding: const EdgeInsets.all(5),
                                 decoration: const BoxDecoration(
-                                  color: Color(0xFF8B5CF6),
                                   shape: BoxShape.circle,
+                                  color: Colors.red,
                                 ),
-                                child: const FaIcon(
-                                  FontAwesomeIcons.message,
-                                  color: Colors.white,
-                                  size: 18,
+                                child: Text(
+                                  unread > 9 ? '9+' : unread.toString(),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            );
-                          }
-
-                          // Show badge with unread count
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const ChatsList(),
-                                ),
-                              );
-                            },
-                            child: Stack(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: const BoxDecoration(
-                                    color: Color(0xFF8B5CF6),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const FaIcon(
-                                    FontAwesomeIcons.message,
-                                    color: Colors.white,
-                                    size: 18,
-                                  ),
-                                ),
-                                Positioned(
-                                  right: 0,
-                                  top: 0,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(5),
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.red,
-                                    ),
-                                    child: Text(
-                                      unread > 9 ? '9+' : unread.toString(),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
                             ),
-                          );
-                        },
+                        ],
                       ),
-                      SizedBox(width: 10),
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => SearchScreen(user: user),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF8B5CF6),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const FaIcon(
-                            FontAwesomeIcons.magnifyingGlass,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                        ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 10),
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SearchScreen(user: user),
                       ),
-                    ],
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF8B5CF6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const FaIcon(
+                      FontAwesomeIcons.magnifyingGlass,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

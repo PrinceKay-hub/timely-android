@@ -26,7 +26,6 @@ class StatusTicks extends StatelessWidget {
         );
         break;
       case MessageStatus.sent:
-      default:
         icon = const Text(
           '✓',
           style: TextStyle(fontSize: 12, color: Colors.white70),

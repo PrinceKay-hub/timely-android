@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:booking/core/services/send_notification.dart';
 import 'package:booking/data/models/portfolio_model.dart';
 import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_state.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -102,7 +103,7 @@ class PortfolioCubit extends Cubit<PortfolioState> {
   }
 
 // Inside your PortfolioCubit (or similar class)
-Future<void> toggleLike(String serviceId, String imageId) async {
+Future<void> toggleLike(String serviceId, String imageId, String providerId, String userName) async {
   final currentState = state;
   if (currentState is! PortfolioLoaded) return;
 
@@ -154,12 +155,37 @@ Future<void> toggleLike(String serviceId, String imageId) async {
         transaction.update(docRef, {
           'likes': FieldValue.arrayUnion([userId]),
         });
+        sendPushNotification(receiverId: providerId, senderName: userName);
       }
     });
   } catch (e) {
     emit(PortfolioError('Failed to toggle like: $e'));
   }
 }
+
+// ─── Private push helper ─────────────────────────────
+  Future<void> sendPushNotification({
+    required String receiverId,
+    required String senderName,
+  }) async {
+    try {
+      // Fetch receiver's FCM token
+      final userDoc = await _firestore.collection('users').doc(receiverId).get();
+      if (!userDoc.exists) return;
+      final token = userDoc.data()?['fcmToken'] as String?;
+      if (token == null || token.isEmpty) return;
+
+      await SendNotificationService().sendNotificationViaCloudFunction(
+        title: senderName,
+        body: 'Liked your portfolio image',
+        deviceToken: token,
+      );
+    } catch (e) {
+      // Log but do not rethrow – we don't want to fail the message sending
+      print('Push notification error: $e');
+    }
+  }
+
 
 
 @override

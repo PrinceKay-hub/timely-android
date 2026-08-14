@@ -1,20 +1,16 @@
 
-import 'package:booking/presentaion/auth/cubit/auth_cubit.dart';
-import 'package:booking/presentaion/auth/cubit/auth_state.dart';
+import 'package:booking/core/services/upgrader_service.dart';
 import 'package:booking/presentaion/connectivity/cubit/connectivity_cubit.dart';
 import 'package:booking/presentaion/connectivity/cubit/connectivity_state.dart';
 import 'package:booking/presentaion/provider/cubit/service_data/service_data_cubit.dart';
-import 'package:booking/presentaion/screens/home/cubit/home_cubit.dart';
+import 'package:booking/presentaion/screens/home/cubit_home/home_cubit.dart';
 import 'package:booking/presentaion/screens/home/widget/categories_section.dart';
 import 'package:booking/presentaion/screens/home/widget/modern_app_bar.dart';
 import 'package:booking/presentaion/screens/home/widget/recommended_section.dart';
 import 'package:booking/presentaion/screens/home/widget/special_offers_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:upgrader/upgrader.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic> user;
@@ -33,7 +29,7 @@ class _HomeScreenState extends State<HomeScreen>
   void initState() {
     super.initState();
     _initHome();
-    _saveFCMToken();
+    loadRecommendedServices();
   }
 
   Future<void> _initHome() async {
@@ -42,45 +38,36 @@ class _HomeScreenState extends State<HomeScreen>
     homeCubit.loadCategories();
     // Get current location
     homeCubit.updateLocation();
-    // Fetch service data (already done by ServiceDataCubit, but we can trigger if needed)
-    context.read<ServiceDataCubit>().fetchServiceData();
   }
 
-  Future<void> _saveFCMToken() async {
-    final DeviceInfoPlugin deviceInfoPlugin = DeviceInfoPlugin();
-    Map<String, dynamic> deviceData = {};
-
-    AndroidDeviceInfo androidInfo = await deviceInfoPlugin.androidInfo;
-        deviceData = {
-          'model': androidInfo.model,
-          'manufacturer': androidInfo.manufacturer,
-          'brand': androidInfo.brand,
-          'androidVersion': androidInfo.version.release,
-          'sdkInt': androidInfo.version.sdkInt,
-          'isPhysicalDevice': androidInfo.isPhysicalDevice,
-          'deviceType': 'Android',
-        };
-    
-    final authState = context.read<AuthCubit>().state;
-    if (authState is AuthAuthenticated) {
-      final token = await FirebaseMessaging.instance.getToken();
-      if (token != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(widget.user['id'])
-            .set(
-              {
-                'fcmToken': token,
-                'deviceInfo': deviceData,
-              }, SetOptions(merge: true));
-      }
+  Future<void> loadRecommendedServices() async {
+    final serviceDataCubit = context.read<ServiceDataCubit>();
+    if (serviceDataCubit.state is! ServiceDataLoaded) {
+      await serviceDataCubit.fetchServiceData();
+    } else {
+      return;
     }
   }
+
 
   Future<void> onRefresh() async {
     context.read<ServiceDataCubit>().fetchServiceData();
     Future.delayed(Duration(milliseconds: 2));
   }
+
+  final upgrader = Upgrader(
+  debugLogging: true,
+  storeController: UpgraderStoreController(
+    onAndroid: () => BackendUpgraderStore(
+      platformKey: 'android',
+      manifestUrl: 'https://raw.githubusercontent.com/PrinceKay-hub/timely-android/main/app-version.json',
+    ),
+    oniOS: () => BackendUpgraderStore(
+      platformKey: 'ios',
+      manifestUrl: 'https://raw.githubusercontent.com/PrinceKay-hub/timely-android/main/app-version.json',
+    ),
+  ),
+);
 
   @override
   Widget build(BuildContext context) {
@@ -98,11 +85,10 @@ class _HomeScreenState extends State<HomeScreen>
           );
         } else if (state.status == ConnectivityStatus.online) {
           ScaffoldMessenger.of(context).hideCurrentSnackBar();
-          // Optionally refresh data
-          context.read<ServiceDataCubit>().fetchServiceData();
         }
       },
       child: UpgradeAlert(
+        upgrader: upgrader,
         child: RefreshIndicator(
           onRefresh: onRefresh,
           child: Scaffold(
@@ -118,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen>
                     delegate: SliverChildListDelegate.fixed([
                       SpecialOffersCard(user: widget.user),
                       CategoriesSection(user: widget.user),
-                      RecommendedSection(user: widget.user),
+                      RecommendedSection(),
                     ]),
                   ),
                 ),

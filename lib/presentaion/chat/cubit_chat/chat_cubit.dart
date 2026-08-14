@@ -115,73 +115,106 @@ class ChatCubit extends Cubit<ChatState> {
 
   // ─── Get or Create Chat ─────────────────────────────
   Future<String> getOrCreateChat({
-    required String currentUserId,
-    String? currentUserName,
-    String? currentUserPhoto,
-    required String otherUserId,
-    String? otherUserName,
-    String? otherUserPhoto,
-    String? serviceId,
-    String? serviceName,
-    String? providerId,
-  }) async {
-    final chatId = chatIdFor(currentUserId, otherUserId);
-    final docRef = _firestore.collection('chats').doc(chatId);
-    final docSnap = await docRef.get();
+  required String currentUserId,
+  String? currentUserName,
+  String? currentUserPhoto,
+  required String otherUserId,
+  String? otherUserName,
+  String? otherUserPhoto,
+  String? serviceId,
+  String? serviceName,
+  String? providerId,
+}) async {
+  final chatId = chatIdFor(currentUserId, otherUserId);
+  final docRef = _firestore.collection('chats').doc(chatId);
+  final docSnap = await docRef.get();
 
-    final resolvedProviderId = providerId ?? otherUserId;
+  final resolvedProviderId = providerId ?? otherUserId;
+  ChatSummary chatSummary;
 
-    if (!docSnap.exists) {
-      final newChat = {
-        'participants': [currentUserId, otherUserId]..sort(),
-        'participantNames': {
-          if (currentUserName != null) currentUserId: currentUserName,
-          if (otherUserName != null) otherUserId: otherUserName,
-        },
-        'participantPhotos': {
-          if (currentUserPhoto != null) currentUserId: currentUserPhoto,
-          if (otherUserPhoto != null) otherUserId: otherUserPhoto,
-        },
-        'serviceId': serviceId,
-        'serviceName': serviceName,
-        'providerId': resolvedProviderId,
-        'unreadCount': {currentUserId: 0, otherUserId: 0},
-        'lastMessage': '',
-        'lastMessageAt': FieldValue.serverTimestamp(),
-        'createdAt': FieldValue.serverTimestamp(),
-      };
-      await docRef.set(newChat);
-    } else {
-      // Update metadata if needed
-      final existing = ChatSummary.fromFirestore(docSnap);
-      final updates = <String, dynamic>{};
-      if (currentUserName != null &&
-          (existing.participantNames?[currentUserId] != currentUserName)) {
-        updates['participantNames.$currentUserId'] = currentUserName;
-      }
-      if (otherUserName != null &&
-          (existing.participantNames?[otherUserId] != otherUserName)) {
-        updates['participantNames.$otherUserId'] = otherUserName;
-      }
-      if (currentUserPhoto != null &&
-          (existing.participantPhotos?[currentUserId] != currentUserPhoto)) {
-        updates['participantPhotos.$currentUserId'] = currentUserPhoto;
-      }
-      if (otherUserPhoto != null &&
-          (existing.participantPhotos?[otherUserId] != otherUserPhoto)) {
-        updates['participantPhotos.$otherUserId'] = otherUserPhoto;
-      }
-      if (existing.providerId == null) {
-        updates['providerId'] = resolvedProviderId;
-      }
-      if (updates.isNotEmpty) {
-        await docRef.update(updates);
-      }
+  if (!docSnap.exists) {
+    final newChat = {
+      'participants': [currentUserId, otherUserId]..sort(),
+      'participantNames': {
+        if (currentUserName != null) currentUserId: currentUserName,
+        if (otherUserName != null) otherUserId: otherUserName,
+      },
+      'participantPhotos': {
+        if (currentUserPhoto != null) currentUserId: currentUserPhoto,
+        if (otherUserPhoto != null) otherUserId: otherUserPhoto,
+      },
+      'serviceId': serviceId,
+      'serviceName': serviceName,
+      'providerId': resolvedProviderId,
+      'unreadCount': {currentUserId: 0, otherUserId: 0},
+      'lastMessage': '',
+      'lastMessageAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+    await docRef.set(newChat);
+
+    // Build a local summary immediately — don't wait for the snapshot
+    // listener to round-trip. Use client-side timestamps as placeholders;
+    // they'll be overwritten once the listener catches up.
+    final now = DateTime.now();
+    chatSummary = ChatSummary(
+      id: chatId,
+      participants: [currentUserId, otherUserId]..sort(),
+      participantNames: {
+        if (currentUserName != null) currentUserId: currentUserName,
+        if (otherUserName != null) otherUserId: otherUserName,
+      },
+      participantPhotos: {
+        if (currentUserPhoto != null) currentUserId: currentUserPhoto,
+        if (otherUserPhoto != null) otherUserId: otherUserPhoto,
+      },
+      serviceId: serviceId,
+      serviceName: serviceName,
+      providerId: resolvedProviderId,
+      unreadCount: {currentUserId: 0, otherUserId: 0},
+      lastMessage: '',
+      lastMessageAt: now,
+      createdAt: now,
+    );
+  } else {
+    final existing = ChatSummary.fromFirestore(docSnap);
+    final updates = <String, dynamic>{};
+    if (currentUserName != null &&
+        (existing.participantNames?[currentUserId] != currentUserName)) {
+      updates['participantNames.$currentUserId'] = currentUserName;
     }
-    return chatId;
+    if (otherUserName != null &&
+        (existing.participantNames?[otherUserId] != otherUserName)) {
+      updates['participantNames.$otherUserId'] = otherUserName;
+    }
+    if (currentUserPhoto != null &&
+        (existing.participantPhotos?[currentUserId] != currentUserPhoto)) {
+      updates['participantPhotos.$currentUserId'] = currentUserPhoto;
+    }
+    if (otherUserPhoto != null &&
+        (existing.participantPhotos?[otherUserId] != otherUserPhoto)) {
+      updates['participantPhotos.$otherUserId'] = otherUserPhoto;
+    }
+    if (existing.providerId == null) {
+      updates['providerId'] = resolvedProviderId;
+    }
+    if (updates.isNotEmpty) {
+      await docRef.update(updates);
+    }
+    chatSummary = existing; // already exists, so it's already in state.chats
+                            // via the listener in the normal case — but see below
   }
 
-  // ─── Send Message ────────────────────────────────────
+  // Ensure it's present in local state right now, regardless of whether
+  // the snapshot listener has fired yet.
+  final exists = state.chats.any((c) => c.id == chatId);
+  if (!exists) {
+    emit(state.copyWith(chats: [chatSummary, ...state.chats]));
+  }
+
+  return chatId;
+}
+
   // ─── Send Message ────────────────────────────────────
   Future<void> sendMessage(String chatId, String senderId, String text) async {
     try {
