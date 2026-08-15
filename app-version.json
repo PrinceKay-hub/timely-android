@@ -1,13 +1,13 @@
 {
   "android": {
-    "version": "3.7.8",
+    "version": "3.7.7",
     "url": "https://play.google.com/store/apps/details?id=com.timely.booking",
     "releaseNotes": "Bug fixes and performance improvements.",
     "minVersion": "3.7.0",
     "critical": false
   },
   "ios": {
-    "version": "3.7.8",
+    "version": "3.7.7",
     "url": "https://apps.apple.com/app/6760649428",
     "releaseNotes": "Bug fixes and performance improvements.",
     "minVersion": "3.7.0",
