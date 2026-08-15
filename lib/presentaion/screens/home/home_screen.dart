@@ -1,4 +1,3 @@
-
 import 'package:booking/core/services/upgrader_service.dart';
 import 'package:booking/presentaion/connectivity/cubit/connectivity_cubit.dart';
 import 'package:booking/presentaion/connectivity/cubit/connectivity_state.dart';
@@ -49,30 +48,30 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-
   Future<void> onRefresh() async {
     context.read<ServiceDataCubit>().fetchServiceData();
     Future.delayed(Duration(milliseconds: 2));
   }
 
   final upgrader = Upgrader(
-  debugLogging: true,
-  storeController: UpgraderStoreController(
-    onAndroid: () => BackendUpgraderStore(
-      platformKey: 'android',
-      manifestUrl: 'https://raw.githubusercontent.com/PrinceKay-hub/timely-android/main/app-version.json',
+    storeController: UpgraderStoreController(
+      onAndroid: () => BackendUpgraderStore(
+        platformKey: 'android',
+        manifestUrl:
+            'https://raw.githubusercontent.com/PrinceKay-hub/timely-android/main/app-version.json',
+      ),
+      oniOS: () => BackendUpgraderStore(
+        platformKey: 'ios',
+        manifestUrl:
+            'https://raw.githubusercontent.com/PrinceKay-hub/timely-android/main/app-version.json',
+      ),
     ),
-    oniOS: () => BackendUpgraderStore(
-      platformKey: 'ios',
-      manifestUrl: 'https://raw.githubusercontent.com/PrinceKay-hub/timely-android/main/app-version.json',
-    ),
-  ),
-);
+  );
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); 
-    return  BlocListener<ConnectivityCubit, ConnectivityState>(
+    super.build(context);
+    return BlocListener<ConnectivityCubit, ConnectivityState>(
       listener: (context, state) {
         if (state.status == ConnectivityStatus.offline) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -80,7 +79,9 @@ class _HomeScreenState extends State<HomeScreen>
               content: Text('You are offline. Some features may be limited.'),
               duration: Duration(days: 1),
               behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
           );
         } else if (state.status == ConnectivityStatus.online) {

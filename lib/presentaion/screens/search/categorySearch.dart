@@ -491,7 +491,7 @@ class _CategoryResultsScreenState extends State<CategoryResultsScreen> {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF3F4F6),
+                        color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(color: Colors.grey[300]!),
                       ),

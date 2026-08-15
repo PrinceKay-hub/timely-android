@@ -27,7 +27,7 @@ class ModernAppBar extends StatelessWidget {
     final greeting = _getTimeBasedGreeting();
     final authState = context.watch<AuthCubit>().state;
     return SliverAppBar(
-      toolbarHeight: 70,
+      toolbarHeight: 85,
       pinned: true,
       elevation: 0,
       automaticallyImplyLeading: false, // Prevents back button layout shifts
