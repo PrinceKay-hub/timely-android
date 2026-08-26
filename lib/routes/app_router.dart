@@ -30,7 +30,7 @@ class AppRouter {
   };
 
   static bool _isAuthed(AuthState state) =>
-      state is AuthAuthenticated || state is AuthAuthenticatedGoog;
+      state is AuthAuthenticated;
 
   // Must be created once — after AuthCubit exists — and reused for the
   // app's lifetime (constructing a new GoRouter on every rebuild would

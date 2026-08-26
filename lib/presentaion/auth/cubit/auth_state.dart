@@ -14,21 +14,10 @@ class AuthInitial extends AuthState {}
 
 class AuthLoading extends AuthState {}
 
-class AuthLoadingGoog extends AuthState {}
-
 class AuthAuthenticated extends AuthState {
   final UserEntity user;
 
   const AuthAuthenticated(this.user);
-
-  @override
-  List<Object> get props => [user];
-}
-
-class AuthAuthenticatedGoog extends AuthState {
-  final UserEntity user;
-
-  const AuthAuthenticatedGoog(this.user);
 
   @override
   List<Object> get props => [user];

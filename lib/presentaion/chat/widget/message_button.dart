@@ -33,7 +33,7 @@ class _MessageButtonState extends State<MessageButton> {
 
   Future<void> _handlePress() async {
     final authState = context.read<AuthCubit>().state; // assuming you have auth cubit
-    if (authState is! AuthAuthenticated || authState is! AuthAuthenticatedGoog) return;
+    if (authState is! AuthAuthenticated) return;
     final user = authState.user;
 
     setState(() => _loading = true);

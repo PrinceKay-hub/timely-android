@@ -27,16 +27,6 @@ class AppWrapper extends StatelessWidget {
           return HomeEntry(user: user);
         }
 
-        if (authState is AuthAuthenticatedGoog) {
-          final user = authState.user;
-
-          context.read<PresenceCubit>().startOwnPresence(user.id);
-          context.read<ChatCubit>().subscribeToChats(user.id);
-          SaveToken().saveFCMToken(user.id);
-          
-          return HomeEntry(user: authState.user);
-        }
-
         // ----- UNAUTHENTICATED -----
         if (authState is AuthUnauthenticated) {
           context.read<PresenceCubit>().stopOwnPresence();

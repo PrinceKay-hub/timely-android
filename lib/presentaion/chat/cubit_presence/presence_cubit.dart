@@ -104,7 +104,7 @@ class PresenceCubit extends Cubit<PresenceState> {
 String formatPresenceLabel(PresenceInfo? presence) {
   if (presence == null) return '';
   if (presence.state == 'online') return 'Online';
-  if (presence.lastSeen == null) return '';
+  if (presence.lastSeen == null) return 'Last seen a while ago';
   final diff = DateTime.now().difference(presence.lastSeen!);
   final minutes = diff.inMinutes;
   if (minutes < 1) return 'Last seen just now';

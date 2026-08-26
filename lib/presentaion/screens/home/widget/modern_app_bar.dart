@@ -30,11 +30,9 @@ class ModernAppBar extends StatelessWidget {
       toolbarHeight: 85,
       pinned: true,
       elevation: 0,
-      automaticallyImplyLeading: false, // Prevents back button layout shifts
-      titleSpacing: 0, // Allows container to stretch to the screen edges
+      automaticallyImplyLeading: false,
+      titleSpacing: 0,
       backgroundColor: Colors.transparent,
-
-      // 1. Move your UI code out of flexibleSpace and into the title property
       flexibleSpace: Container(
         padding: const EdgeInsets.only(left: 20, right: 20, top: 50, bottom: 20),
         decoration: BoxDecoration(

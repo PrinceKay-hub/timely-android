@@ -40,10 +40,10 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> signInWithGoogle() async {
-    emit(AuthLoadingGoog());
+    emit(AuthLoading());
     try {
       final user = await authRepository.signInWithGoogle();
-      emit(AuthAuthenticatedGoog(user));
+      emit(AuthAuthenticated(user));
     } catch (e) {
       emit(AuthError(e.toString()));
     }

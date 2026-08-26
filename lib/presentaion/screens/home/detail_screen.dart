@@ -6,6 +6,7 @@ import 'package:booking/presentaion/chat/cubit_presence/presence_cubit.dart';
 import 'package:booking/presentaion/common/pages/error_screen.dart';
 import 'package:booking/presentaion/common/pages/gallery_widget.dart';
 import 'package:booking/presentaion/common/pages/loading_screen.dart';
+import 'package:booking/presentaion/common/widgets/open_status_badge.dart';
 import 'package:booking/presentaion/common/widgets/working_hours_display.dart';
 import 'package:booking/presentaion/provider/cubit/service_detail/service_detail_cubit.dart';
 import 'package:booking/presentaion/provider/pages/portfolio/bloc/portfolio_bloc.dart';
@@ -40,7 +41,7 @@ class _DetailScreenState extends State<DetailScreen> {
   late final portCubit = context.read<PortfolioCubit>();
   late final service = context.read<ServiceDetailCubit>();
   late final userCubit = context.read<UserCubit>();
-  
+
   bool isFavorite = false;
   int currentIndex = 0;
   bool _isLoading = false;
@@ -180,7 +181,6 @@ class _DetailScreenState extends State<DetailScreen> {
       context.go('/home-entry');
     }
   }
-  
 
   @override
   Widget build(BuildContext context) {
@@ -224,23 +224,29 @@ class _DetailScreenState extends State<DetailScreen> {
                   if (!mounted) return;
                   reviewCubit.fetcReviews(data['providerId']);
                   portCubit.loadPortfolio(data['id']);
-                  context.read<PresenceCubit>().subscribeToPresence(data['providerId']);
-                  
+                  context.read<PresenceCubit>().subscribeToPresence(
+                    data['providerId'],
+                  );
                 });
               }
 
-              final presence = context.watch<PresenceCubit>().state.presenceByUid[data['providerId']];
+              final presence = context
+                  .watch<PresenceCubit>()
+                  .state
+                  .presenceByUid[data['providerId']];
 
               return BlocBuilder<UserCubit, UserState>(
                 buildWhen: (previous, current) {
                   if (current is UserLoaded) {
-                    final prevUser =
-                        previous is UserLoaded ? previous.user : null;
+                    final prevUser = previous is UserLoaded
+                        ? previous.user
+                        : null;
                     return prevUser == null ||
                         prevUser['id'] != current.user['id'] ||
                         prevUser['isEmailVerified'] !=
                             current.user['isEmailVerified'] ||
-                        prevUser['displayName'] != current.user['displayName'] ||
+                        prevUser['displayName'] !=
+                            current.user['displayName'] ||
                         prevUser['photoURL'] != current.user['photoURL'];
                   }
                   // Non-Loaded states (Loading/Initial/Error): only
@@ -342,9 +348,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                 width: double.infinity,
                                                 height: 400,
                                                 color: Colors.grey[300],
-                                                child: const Icon(
-                                                  Icons.error,
-                                                ),
+                                                child: const Icon(Icons.error),
                                               ),
                                         ),
                                       );
@@ -400,10 +404,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                                 context,
                                               ).showSnackBar(
                                                 SnackBar(
-                                                  backgroundColor:
-                                                      Colors.green,
-                                                  behavior: SnackBarBehavior
-                                                      .floating,
+                                                  backgroundColor: Colors.green,
+                                                  behavior:
+                                                      SnackBarBehavior.floating,
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius:
                                                         BorderRadiusGeometry.circular(
@@ -423,8 +426,8 @@ class _DetailScreenState extends State<DetailScreen> {
                                                 SnackBar(
                                                   backgroundColor: Colors.red,
                                                   showCloseIcon: true,
-                                                  behavior: SnackBarBehavior
-                                                      .floating,
+                                                  behavior:
+                                                      SnackBarBehavior.floating,
                                                   shape: RoundedRectangleBorder(
                                                     borderRadius:
                                                         BorderRadiusGeometry.circular(
@@ -482,9 +485,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                       borderRadius: BorderRadius.circular(20),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(
-                                            0.05,
-                                          ),
+                                          color: Colors.black.withOpacity(0.05),
                                           blurRadius: 10,
                                           offset: const Offset(0, 5),
                                         ),
@@ -511,16 +512,19 @@ class _DetailScreenState extends State<DetailScreen> {
                                           ],
                                         ),
                                         const SizedBox(height: 12),
-
+                                        OpenStatusBadge(service: data),
+                                        const SizedBox(height: 12),
                                         // Category
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
                                             Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 12,
-                                                vertical: 6,
-                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 6,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: const Color(0xFFEDE9FE),
                                                 borderRadius:
@@ -541,23 +545,37 @@ class _DetailScreenState extends State<DetailScreen> {
                                                     data['category'],
                                                     style: TextStyle(
                                                       color: Color(0xFF8B5CF6),
-                                                      fontWeight: FontWeight.w600,
+                                                      fontWeight:
+                                                          FontWeight.w600,
                                                       fontSize: 13,
                                                     ),
                                                   ),
                                                 ],
                                               ),
                                             ),
+
                                             if (presence != null)
-                                                Text(
+                                              Container(
+                                                padding: EdgeInsets.all(10),
+                                                decoration: BoxDecoration(
+                                                  color: Theme.of(
+                                                    context,
+                                                  ).colorScheme.secondary,
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                child: Text(
                                                   formatPresenceLabel(presence),
                                                   style: TextStyle(
                                                     fontSize: 12,
-                                                    color: presence.state == 'online'
+                                                    color:
+                                                        presence.state ==
+                                                            'online'
                                                         ? Colors.green
                                                         : Colors.grey,
                                                   ),
                                                 ),
+                                              ),
                                           ],
                                         ),
                                         const SizedBox(height: 16),
@@ -594,8 +612,9 @@ class _DetailScreenState extends State<DetailScreen> {
                                                     vertical: 6,
                                                   ),
                                               decoration: BoxDecoration(
-                                                color: Colors.amber
-                                                    .withOpacity(0.1),
+                                                color: Colors.amber.withOpacity(
+                                                  0.1,
+                                                ),
                                                 borderRadius:
                                                     BorderRadius.circular(20),
                                               ),
@@ -686,8 +705,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   'Book',
                                                   style: TextStyle(
                                                     fontSize: 16,
-                                                    fontWeight:
-                                                        FontWeight.bold,
+                                                    fontWeight: FontWeight.bold,
                                                     color: Colors.white,
                                                   ),
                                                 ),
@@ -715,8 +733,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   context,
                                                 ).showSnackBar(
                                                   SnackBar(
-                                                    backgroundColor:
-                                                        Colors.red,
+                                                    backgroundColor: Colors.red,
                                                     showCloseIcon: true,
                                                     behavior: SnackBarBehavior
                                                         .floating,
@@ -765,8 +782,7 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   context,
                                                 ).showSnackBar(
                                                   SnackBar(
-                                                    backgroundColor:
-                                                        Colors.red,
+                                                    backgroundColor: Colors.red,
                                                     showCloseIcon: true,
                                                     behavior: SnackBarBehavior
                                                         .floating,
@@ -782,11 +798,19 @@ class _DetailScreenState extends State<DetailScreen> {
                                                   ),
                                                 );
                                               } else {
+                                                final lat =
+                                                    (data['latitude'] as num?)
+                                                        ?.toDouble() ??
+                                                    0.0;
+                                                final lng =
+                                                    (data['longitude'] as num?)
+                                                        ?.toDouble() ??
+                                                    0.0;
                                                 _isLoading
                                                     ? null
                                                     : _handleDirections(
-                                                        data['latitude'],
-                                                        data['longitude'],
+                                                        lat,
+                                                        lng,
                                                       );
                                               }
                                             },

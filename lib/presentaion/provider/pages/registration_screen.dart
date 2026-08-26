@@ -3,6 +3,7 @@ import 'package:booking/presentaion/provider/cubit/registration/service_registra
 import 'package:booking/presentaion/provider/cubit/registration/service_registration_state.dart';
 import 'package:booking/presentaion/provider/pages/manage_service.dart';
 import 'package:booking/presentaion/provider/pages/widgets/service_from.dart';
+import 'package:booking/presentaion/screens/home/cubit_home/home_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -23,6 +24,13 @@ class _ServiceRegistrationScreenState extends State<ServiceRegistrationScreen> {
   void initState() {
     super.initState();
     context.read<ServiceRegistrationCubit>().loadServicesByProvider(widget.userId);
+    _initCategory();
+  }
+
+   Future<void> _initCategory() async {
+    final homeCubit = context.read<HomeCubit>();
+    // Load categories
+    homeCubit.loadCategories();
   }
 
   @override

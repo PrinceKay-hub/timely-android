@@ -18,6 +18,19 @@ class DescriptionStep extends StatefulWidget {
 class _DescriptionStepState extends State<DescriptionStep> {
   bool _isLoading = false;
   static const int _maxRetries = 3;
+  late final TextEditingController _descriptionController;
+
+  @override
+  void initState() {
+    super.initState();
+    _descriptionController = TextEditingController(text: widget.service.description);
+  }
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
 
   Future<String> _callGeminiWithRetry(String prompt,
       {int attempt = 0}) async {
@@ -70,34 +83,34 @@ class _DescriptionStepState extends State<DescriptionStep> {
         'Failed to load text: ${response.statusCode} ${response.body}');
   }
 
-  Future<String> _callGroq(String prompt) async {
-    final groqApiKey = dotenv.env['GROQ_API_KEY'] ?? '';
-    final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $groqApiKey',
-      },
-      body: jsonEncode({
-        'model': 'llama-3.3-70b-versatile',
-        'messages': [
-          {'role': 'user', 'content': prompt}
-        ],
-      }),
-    );
+  Future<String> _callGroq(String prompt, {required String model}) async {
+  final groqApiKey = dotenv.env['GROQ_API_KEY'] ?? '';
+  final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');
+  final response = await http.post(
+    url,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $groqApiKey',
+    },
+    body: jsonEncode({
+      'model': model,
+      'messages': [
+        {'role': 'user', 'content': prompt}
+      ],
+    }),
+  );
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final content =
-          data['choices']?[0]?['message']?['content'] as String?;
-      if (content == null) throw Exception('No content returned from Groq');
-      return content;
-    }
-
-    throw Exception(
-        'Groq failed: ${response.statusCode} ${response.body}');
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    final content =
+        data['choices']?[0]?['message']?['content'] as String?;
+    if (content == null) throw Exception('No content returned from Groq ($model)');
+    return content;
   }
+
+  throw Exception(
+      'Groq ($model) failed: ${response.statusCode} ${response.body}');
+}
 
   Future<void> _suggestDescription() async {
     if (widget.service.name.isEmpty) {
@@ -117,16 +130,25 @@ class _DescriptionStepState extends State<DescriptionStep> {
       try {
         aiText = await _callGeminiWithRetry(prompt);
       } catch (e) {
-        debugPrint('Gemini failed, falling back to Groq: $e');
-        aiText = await _callGroq(prompt);
+        debugPrint('Gemini failed, falling back to Groq (gpt-oss-120b): $e');
+        try {
+          aiText = await _callGroq(prompt, model: 'openai/gpt-oss-120b');
+        } catch (e2) {
+          debugPrint('Groq gpt-oss-120b failed, falling back to Groq (qwen3.6-27b): $e2');
+          aiText = await _callGroq(prompt, model: 'qwen/qwen3.6-27b');
+        }
       }
 
       final trimmed = aiText.trim();
       final clamped =
           trimmed.length > 500 ? trimmed.substring(0, 500) : trimmed;
       if (mounted) {
-        context.read<ServiceRegistrationCubit>().updateServiceDescription(clamped);
-      }
+      context.read<ServiceRegistrationCubit>().updateServiceDescription(clamped);
+      _descriptionController.value = TextEditingValue(
+        text: clamped,
+        selection: TextSelection.collapsed(offset: clamped.length),
+      );
+    }
     } catch (e) {
       debugPrint('All providers failed: $e');
       if (mounted) {
@@ -209,8 +231,7 @@ class _DescriptionStepState extends State<DescriptionStep> {
                 // ValueKey forces a rebuild of the field when AI fills the
                 // description so initialValue reflects the new content.
                 TextFormField(
-                  key: ValueKey(description),
-                  initialValue: description,
+                  controller: _descriptionController,
                   onChanged: context
                       .read<ServiceRegistrationCubit>()
                       .updateServiceDescription,

@@ -96,14 +96,6 @@ class _AuthSignupState extends State<AuthSignup> {
             SaveToken().saveFCMToken(user.id);
           }
 
-          if (state is AuthAuthenticatedGoog) {
-            final user = state.user;
-            final destination = (widget.from != null && widget.from!.isNotEmpty)
-                ? widget.from!
-                : '/home-entry';
-            context.go(destination);
-            SaveToken().saveFCMToken(user.id);
-          }
         },
         builder: (context, state) {
           return SafeArea(
@@ -517,8 +509,7 @@ class _AuthSignupState extends State<AuthSignup> {
                             const SizedBox(height: 24),
 
                             // Sign Up Button
-                            if (state is AuthLoading ||
-                                state is AuthLoadingGoog)
+                            if (state is AuthLoading)
                               SizedBox(
                                 width: double.infinity,
                                 child: Container(

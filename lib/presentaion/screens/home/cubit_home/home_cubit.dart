@@ -38,10 +38,13 @@ class HomeCubit extends Cubit<HomeState> {
   }
 
   Future<void> updateLocation() async {
+  try {
     final position = await locationService.getCurrentLocation();
     if (position != null) {
-      // You might want to reverse geocode here to get a human-readable location
       setLocation('${position.latitude},${position.longitude}');
     }
+  } catch (e) {
+    emit(state.copyWith(locationError: e.toString()));
   }
+}
 }

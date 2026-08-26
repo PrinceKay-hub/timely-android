@@ -26,7 +26,6 @@ class SearchCubit extends Cubit<SearchState> {
     required String query,
     required String region,
     String? district,
-    double maxDistanceKm = 10,
     String sortBy = 'distance',
     int pageSize = 20,
   }) async {
@@ -36,7 +35,6 @@ class SearchCubit extends Cubit<SearchState> {
       'query': query,
       'region': region,
       'district': district,
-      'maxDistanceKm': maxDistanceKm,
       'sortBy': sortBy,
       'pageSize': pageSize,
     };
@@ -52,7 +50,6 @@ class SearchCubit extends Cubit<SearchState> {
         query: query,
         region: region,
         district: district,
-        maxDistanceKm: maxDistanceKm,
         sortBy: sortBy,
         page: 1,
         pageSize: pageSize,
@@ -81,7 +78,7 @@ class SearchCubit extends Cubit<SearchState> {
   Future<void> searchByCategoryAction({
     required String category,
     String sortBy = 'distance',
-    double maxDistanceKm = 10,
+    double maxDistanceKm = 50,
     int pageSize = 20,
   }) async {
     final requestId = ++_requestId;
@@ -139,7 +136,6 @@ class SearchCubit extends Cubit<SearchState> {
           query: params['query'] as String,
           region: params['region'] as String,
           district: params['district'] as String?,
-          maxDistanceKm: (params['maxDistanceKm'] as num?)?.toDouble() ?? 10,
           sortBy: params['sortBy'] as String? ?? 'distance',
           page: nextPage,
           pageSize: (params['pageSize'] as num?)?.toInt() ?? 20,

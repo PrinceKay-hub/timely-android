@@ -71,45 +71,55 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return BlocListener<ConnectivityCubit, ConnectivityState>(
+    return BlocListener<HomeCubit, HomeState>(
+      listenWhen: (prev, curr) => prev.locationError != curr.locationError,
       listener: (context, state) {
-        if (state.status == ConnectivityStatus.offline) {
+        if (state.locationError != null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('You are offline. Some features may be limited.'),
-              duration: Duration(days: 1),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            SnackBar(content: Text('Enable location to see nearby services.')),
           );
-        } else if (state.status == ConnectivityStatus.online) {
-          ScaffoldMessenger.of(context).hideCurrentSnackBar();
         }
       },
-      child: UpgradeAlert(
-        upgrader: upgrader,
-        child: RefreshIndicator(
-          onRefresh: onRefresh,
-          child: Scaffold(
-            backgroundColor: Theme.of(context).colorScheme.secondary,
-            body: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // App bar
-                ModernAppBar(user: widget.user),
-                SliverPadding(
-                  padding: EdgeInsets.zero,
-                  sliver: SliverList(
-                    delegate: SliverChildListDelegate.fixed([
-                      SpecialOffersCard(user: widget.user),
-                      CategoriesSection(user: widget.user),
-                      RecommendedSection(),
-                    ]),
-                  ),
+      child: BlocListener<ConnectivityCubit, ConnectivityState>(
+        listener: (context, state) {
+          if (state.status == ConnectivityStatus.offline) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('You are offline. Some features may be limited.'),
+                duration: Duration(days: 1),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
                 ),
-              ],
+              ),
+            );
+          } else if (state.status == ConnectivityStatus.online) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          }
+        },
+        child: UpgradeAlert(
+          upgrader: upgrader,
+          child: RefreshIndicator(
+            onRefresh: onRefresh,
+            child: Scaffold(
+              backgroundColor: Theme.of(context).colorScheme.secondary,
+              body: CustomScrollView(
+                physics: const BouncingScrollPhysics(),
+                slivers: [
+                  // App bar
+                  ModernAppBar(user: widget.user),
+                  SliverPadding(
+                    padding: EdgeInsets.zero,
+                    sliver: SliverList(
+                      delegate: SliverChildListDelegate.fixed([
+                        SpecialOffersCard(user: widget.user),
+                        CategoriesSection(user: widget.user),
+                        RecommendedSection(),
+                      ]),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -679,7 +679,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 width: 120,
                 fit: BoxFit.cover,
                 memCacheWidth: 240,
-                memCacheHeight: 240,
                 fadeInDuration: const Duration(milliseconds: 200),
                 placeholder: (context, url) => Shimmer.fromColors(
                   baseColor: Theme.of(context).colorScheme.surfaceBright,

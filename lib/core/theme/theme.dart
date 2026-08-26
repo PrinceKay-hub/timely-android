@@ -9,12 +9,14 @@ class AppThemes {
     brightness: Brightness.light,
     primaryColor: Color.fromARGB(255, 95, 46, 209),
     scaffoldBackgroundColor: Colors.white,
-    colorScheme: const ColorScheme.light(
+    colorScheme:  ColorScheme.light(
       primary: Color.fromARGB(255, 95, 46, 209),
       secondary: Color(0xFFF3F4F6),
       surface: Colors.white,
       error: Color(0xFFEF4444),
       onPrimary: Colors.white,
+      surfaceDim: Colors.grey.shade300,
+      surfaceBright:  Colors.grey.shade200,
       onSecondary:  Color(0xFFEDE9FE),
       onSurface: Color(0xFF111827),
       onError: Colors.white,
@@ -165,12 +167,14 @@ class AppThemes {
     brightness: Brightness.dark,
     primaryColor: Color.fromARGB(255, 95, 46, 209),
     scaffoldBackgroundColor: const Color(0xFF111827),
-    colorScheme: const ColorScheme.dark(
+    colorScheme:  ColorScheme.dark(
       primary: Color.fromARGB(255, 95, 46, 209),
       secondary:  Color(0xFF111827),
       surface: Color.fromARGB(255, 23, 30, 43),
       error: Color(0xFFF87171),
       onPrimary: Colors.white,
+      surfaceDim: Colors.grey.shade900,
+      surfaceBright:  Colors.grey.shade800,
       onSecondary: Color.fromARGB(255, 23, 30, 43),
       onSurface: Colors.white,
       onError: Colors.black,

@@ -305,7 +305,7 @@ class _CategoryResultsScreenState extends State<CategoryResultsScreen> {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '$totalCount result${totalCount != 1 ? 's' : ''} found in 10km radius',
+                  '$totalCount result${totalCount != 1 ? 's' : ''} found',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w600,
@@ -644,7 +644,6 @@ class _CategoryResultsScreenState extends State<CategoryResultsScreen> {
                 width: 120,
                 fit: BoxFit.cover,
                 memCacheWidth: 240,
-                memCacheHeight: 240,
                 fadeInDuration: const Duration(milliseconds: 200),
                 placeholder: (context, url) => Shimmer.fromColors(
                   baseColor: Theme.of(context).colorScheme.surfaceBright,

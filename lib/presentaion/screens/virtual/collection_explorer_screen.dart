@@ -172,20 +172,17 @@ class _CollectionsExplorerScreenState extends State<CollectionsExplorerScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: Padding(
-        padding: const EdgeInsets.only(bottom: 49),
-        child: Column(
-          children: [
-            if (_mode != _ExplorerMode.viewer)
-              _Header(title: headerTitle, colors: colors, onBack: _goBack),
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: _buildBody(colors),
-              ),
+      body: Column(
+        children: [
+          if (_mode != _ExplorerMode.viewer)
+            _Header(title: headerTitle, colors: colors, onBack: _goBack),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: _buildBody(colors),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -294,7 +291,8 @@ class _CollectionsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.only(left: 8, top: 8, right: 8, bottom: 55),
+      physics: BouncingScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 8,
@@ -372,7 +370,8 @@ class _StyleGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GridView.builder(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.only(left: 8, top: 8, right: 8, bottom: 55),
+      physics: BouncingScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
         crossAxisSpacing: 8,
@@ -435,17 +434,23 @@ class _ImageViewerState extends State<_ImageViewer> {
               widget.onIndexChanged(i);
             },
             itemBuilder: (context, i) {
-              final style = widget.collection.styles[i];
-              return CachedNetworkImage(
-                imageUrl: style.images.full,
+            final style = widget.collection.styles[i];
+            return CachedNetworkImage(
+              imageUrl: style.images.full,
+              fit: BoxFit.contain,
+              // low-res card image shows instantly while the full image loads
+              placeholder: (_, __) => CachedNetworkImage(
+                imageUrl: style.images.card,
                 fit: BoxFit.contain,
-                // low-res card image shows instantly while the full image loads
-                placeholder: (_, __) => CachedNetworkImage(
-                  imageUrl: style.images.card,
-                  fit: BoxFit.contain,
+                errorWidget: (_, __, ___) => const Center(
+                  child: Icon(Icons.broken_image, color: Colors.white, size: 48),
                 ),
-              );
-            },
+              ),
+              errorWidget: (_, __, ___) => const Center(
+                child: Icon(Icons.broken_image, color: Colors.white, size: 48),
+              ),
+            );
+          },
           ),
           Positioned(
             top: 0,

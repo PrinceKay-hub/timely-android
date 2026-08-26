@@ -7,10 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
-class BasicInfoStep extends StatelessWidget {
+class BasicInfoStep extends StatefulWidget {
   final ServiceEntity service;
   final VoidCallback onOpenChat;
-  static const String _cacheKey = 'categories';
 
   const BasicInfoStep({
     super.key,
@@ -23,6 +22,7 @@ class BasicInfoStep extends StatelessWidget {
     ServiceRegistrationCubit cubit,
   ) async {
     final box = Hive.box('myBox');
+    const String _cacheKey = 'categories';
     final rawCategories = box.get(_cacheKey) as List? ?? [];
     final categoryNames = rawCategories
         .map((c) => (c is Map ? c['name'] : c)?.toString() ?? '')
@@ -66,6 +66,39 @@ class BasicInfoStep extends StatelessWidget {
   }
 
   @override
+  State<BasicInfoStep> createState() => _BasicInfoStepState();
+}
+
+class _BasicInfoStepState extends State<BasicInfoStep> {
+  late final TextEditingController _nameController;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.service.name);
+  }
+
+  @override
+  void didUpdateWidget(covariant BasicInfoStep oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only push external changes (e.g. chat autofill, form reset) into the
+    // controller — never overwrite while the value already matches what the
+    // user is typing, so we don't fight the cursor/selection mid-edit.
+    if (widget.service.name != _nameController.text) {
+      _nameController.value = TextEditingValue(
+        text: widget.service.name,
+        selection: TextSelection.collapsed(offset: widget.service.name.length),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+  
+  @override
   Widget build(BuildContext context) {
     final cubit = context.read<ServiceRegistrationCubit>();
     return SingleChildScrollView(
@@ -89,11 +122,11 @@ class BasicInfoStep extends StatelessWidget {
             style: TextStyle(color: Colors.grey, fontSize: 16),
           ),
           const SizedBox(height: 32),
-          if (service.name.isEmpty)
+          if (widget.service.name.isEmpty)
             Padding(
               padding: const EdgeInsets.only(bottom: 20),
               child: GestureDetector(
-                onTap: onOpenChat,
+                onTap: widget.onOpenChat,
                 child: Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
@@ -146,8 +179,7 @@ class BasicInfoStep extends StatelessWidget {
                 // key ensures the field resets when name is cleared externally
                 // (e.g. resetForm), but preserves typing state otherwise.
                 TextFormField(
-                  key: ValueKey(service.name.isEmpty ? 'empty' : 'filled'),
-                  initialValue: service.name,
+                  controller: _nameController,
                   textCapitalization: TextCapitalization.sentences,
                   onChanged: cubit.updateServiceName,
                   decoration: InputDecoration(
@@ -178,9 +210,9 @@ class BasicInfoStep extends StatelessWidget {
                 Row(
                   children: [
                     IconButton(
-                      onPressed: service.workers > 1
+                      onPressed: widget.service.workers > 1
                           ? () =>
-                                cubit.updateServiceWorkers(service.workers - 1)
+                                cubit.updateServiceWorkers(widget.service.workers - 1)
                           : null,
                       icon: Container(
                         padding: const EdgeInsets.all(8),
@@ -202,7 +234,7 @@ class BasicInfoStep extends StatelessWidget {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          '${service.workers} ${service.workers == 1 ? 'Staff Member' : 'Staff Members'}',
+                          '${widget.service.workers} ${widget.service.workers == 1 ? 'Staff Member' : 'Staff Members'}',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             fontSize: 16,
@@ -213,7 +245,7 @@ class BasicInfoStep extends StatelessWidget {
                     ),
                     IconButton(
                       onPressed: () =>
-                          cubit.updateServiceWorkers(service.workers + 1),
+                          cubit.updateServiceWorkers(widget.service.workers + 1),
                       icon: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(

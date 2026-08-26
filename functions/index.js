@@ -359,7 +359,6 @@ exports.searchProviders = onCall(async (request) => {
     district,
     userLat,
     userLng,
-    maxDistanceKm = 20,
     sortBy = "distance",
     page = 1,
     pageSize = 20,
@@ -371,36 +370,23 @@ exports.searchProviders = onCall(async (request) => {
         "User location is required.",
     );
   }
-  if (typeof maxDistanceKm !== "number" || maxDistanceKm <= 0) {
-    throw new functions.https.HttpsError(
-        "invalid-argument",
-        "maxDistanceKm must be a positive number.",
-    );
-  }
 
   const center = [userLat, userLng];
-  const radiusMeters = maxDistanceKm * 1000;
-  const bounds = geohashQueryBounds(center, radiusMeters);
 
-  let snapshots;
+  let snapshot;
   try {
-    const queryPromises = bounds.map(([start, end]) => {
-      let q = db.collection("services")
-          .where("status", "==", "approved");
+    let q = db.collection("services").where("status", "==", "approved");
 
-      if (region && region.trim() !== "") {
-        q = q.where("region", "==", region);
-        if (district && district.trim() !== "") {
-          q = q.where("district", "==", district);
-        }
+    if (region && region.trim() !== "") {
+      q = q.where("region", "==", region);
+      if (district && district.trim() !== "") {
+        q = q.where("district", "==", district);
       }
+    }
 
-      q = q.orderBy("geohash").startAt(start).endAt(end);
-      return q.get();
-    });
-    snapshots = await Promise.all(queryPromises);
+    snapshot = await q.get();
   } catch (err) {
-    console.error("Firestore geo query failed:", err);
+    console.error("Firestore query failed:", err);
     throw new functions.https.HttpsError(
         "internal",
         "Search failed. Please try again.",
@@ -409,43 +395,35 @@ exports.searchProviders = onCall(async (request) => {
 
   const queryLower = query.toLowerCase().trim();
   const queryTokens = queryLower.split(/\s+/).filter(Boolean);
-  const seen = new Set();
   const allResults = [];
 
-  for (const snapshot of snapshots) {
-    snapshot.forEach((doc) => {
-      if (seen.has(doc.id)) return; // overlapping geohash bounds return dupes
-      seen.add(doc.id);
+  snapshot.forEach((doc) => {
+    const provider = doc.data();
+    if (provider.latitude == null || provider.longitude == null) return;
 
-      const provider = doc.data();
-      if (provider.latitude == null || provider.longitude == null) return;
-
-      // The geohash box is a square; trim it down to an actual circle.
-      const distanceKm =
+    const distanceKm =
       distanceBetween(center, [provider.latitude, provider.longitude]);
-      if (distanceKm > maxDistanceKm) return;
 
-      if (queryTokens.length > 0) {
-        const name = (provider.name || "").toLowerCase();
-        const category = (provider.category || "").toLowerCase();
-        const serviceNames = Array.isArray(provider.services) ?
-          provider.services
-              .map((s) => (s && s.name ? String(s.name).toLowerCase() : ""))
-              .filter(Boolean) :
-          [];
-        const haystack = `${name} ${category} ${serviceNames.join(" ")}`;
-        const matchesAllTokens = queryTokens.every((t) => haystack.includes(t));
-        if (!matchesAllTokens) return;
-      }
+    if (queryTokens.length > 0) {
+      const name = (provider.name || "").toLowerCase();
+      const category = (provider.category || "").toLowerCase();
+      const serviceNames = Array.isArray(provider.services) ?
+        provider.services
+            .map((s) => (s && s.name ? String(s.name).toLowerCase() : ""))
+            .filter(Boolean) :
+        [];
+      const haystack = `${name} ${category} ${serviceNames.join(" ")}`;
+      const matchesAllTokens = queryTokens.every((t) => haystack.includes(t));
+      if (!matchesAllTokens) return;
+    }
 
-      allResults.push({
-        id: doc.id,
-        ...provider,
-        distance: distanceKm,
-        distanceText: `${distanceKm.toFixed(1)} km`,
-      });
+    allResults.push({
+      id: doc.id,
+      ...provider,
+      distance: distanceKm,
+      distanceText: `${distanceKm.toFixed(1)} km`,
     });
-  }
+  });
 
   if (sortBy === "distance") {
     allResults.sort((a, b) => a.distance - b.distance);
@@ -457,7 +435,7 @@ exports.searchProviders = onCall(async (request) => {
   const validPageSize = Math.min(50, Math.max(1, pageSize));
   const startIndex = (validPage - 1) * validPageSize;
   const paginatedResults =
-  allResults.slice(startIndex, startIndex + validPageSize);
+    allResults.slice(startIndex, startIndex + validPageSize);
 
   return {
     providers: paginatedResults,
@@ -477,7 +455,7 @@ exports.searchByCategory = onCall(async (request) => {
     category,
     userLat,
     userLng,
-    maxDistanceKm = 20,
+    maxDistanceKm = 50,
     sortBy = "distance",
     page = 1,
     pageSize = 20,

@@ -19,7 +19,7 @@ class UserCubit extends Cubit<UserState> {
     _subscription = authCubit.stream.listen((authState) {
       if (authState is AuthUnauthenticated) {
         emit(UserInitial()); // clear on logout
-      } else if (authState is AuthAuthenticated || authState is AuthAuthenticatedGoog) {
+      } else if (authState is AuthAuthenticated) {
         loadUser(forceRefresh: true); // fetch fresh on login
       }
     });

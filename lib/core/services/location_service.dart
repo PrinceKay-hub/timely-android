@@ -42,7 +42,7 @@ class LocationService {
     // Get current position
     return await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
-    );
+    ).timeout(const Duration(seconds: 10));
   }
 
   // Calculate distance between two points (in kilometers)

@@ -107,76 +107,78 @@ class PhotosStepState extends State<PhotosStep> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Text(
-                'Upload your photo',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-            ),
-            const Divider(),
-            ListTile(
-              leading: Container(
-                width: 42,
-                height: 42,
+      builder: (_) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.camera_alt_outlined,
-                  color: Colors.purple,
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              title: const Text(
-                'Take a photo',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: const Text('Use your camera'),
-              onTap: () =>
-                  _pickFromCamera().then((_) => Navigator.pop(context)),
-            ),
-            ListTile(
-              leading: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.photo_library_outlined,
-                  color: Colors.blue,
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Upload your photo',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
-              title: const Text(
-                'Choose from gallery',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              const Divider(),
+              ListTile(
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_outlined,
+                    color: Colors.purple,
+                  ),
+                ),
+                title: const Text(
+                  'Take a photo',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text('Use your camera'),
+                onTap: () =>
+                    _pickFromCamera().then((_) => Navigator.pop(context)),
               ),
-              subtitle: const Text('Pick an existing photo'),
-              onTap: () =>
-                  _pickFromGallery().then((_) => Navigator.pop(context)),
-            ),
-            const SizedBox(height: 16),
-          ],
+              ListTile(
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_outlined,
+                    color: Colors.blue,
+                  ),
+                ),
+                title: const Text(
+                  'Choose from gallery',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text('Pick an existing photo'),
+                onTap: () =>
+                    _pickFromGallery().then((_) => Navigator.pop(context)),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );

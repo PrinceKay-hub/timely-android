@@ -58,7 +58,6 @@ class SearchRepositoryImpl {
     required String query,
     required String region,
     String? district,
-    double maxDistanceKm = 10,
     String sortBy = 'distance',
     int page = 1,
     int pageSize = 20,
@@ -73,7 +72,6 @@ class SearchRepositoryImpl {
         'district': district,
         'userLat': position.latitude,
         'userLng': position.longitude,
-        'maxDistanceKm': maxDistanceKm,
         'sortBy': sortBy,
         'page': page,
         'pageSize': pageSize,
@@ -87,7 +85,7 @@ class SearchRepositoryImpl {
 
   Future<SearchResponse> searchByCategory({
     required String category,
-    double maxDistanceKm = 10,
+    double maxDistanceKm = 50,
     String sortBy = 'distance',
     int page = 1,
     int pageSize = 20,

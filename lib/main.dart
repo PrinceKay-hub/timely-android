@@ -1,5 +1,7 @@
 import 'dart:ui';
-
+import 'dart:async';
+import 'dart:io';
+import 'package:http/http.dart' show ClientException;
 import 'package:booking/core/network/firebase_service.dart';
 import 'package:booking/core/services/firebase_messaging_handler.dart';
 import 'package:booking/core/services/local_notification_service.dart';
@@ -81,15 +83,37 @@ void main() async {
 
   await dotenv.load(fileName: ".env");
 
-  FlutterError.onError = (FlutterErrorDetails details) {
-    FlutterError.presentError(details);
-   FirebaseCrashlytics.instance.recordFlutterFatalError(details);
-  };
+  bool _isRecoverableNetworkOrImageError(Object exception) {
+  if (exception is SocketException) return true;
+  if (exception is ClientException) return true; // http/dio client exceptions
+  if (exception is TimeoutException) return true;
+  // Flutter wraps image-loading failures in NetworkImageLoadException
+  final typeName = exception.runtimeType.toString();
+  if (typeName.contains('NetworkImageLoadException')) return true;
+  return false;
+}
 
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
+  FlutterError.onError = (FlutterErrorDetails details) {
+  FlutterError.presentError(details);
+
+  if (_isRecoverableNetworkOrImageError(details.exception)) {
+    // Log it so you still see it in Crashlytics, but don't count it
+    // against crash-free-users — it's not an app crash.
+    FirebaseCrashlytics.instance.recordFlutterError(details);
+  } else {
+    FirebaseCrashlytics.instance.recordFlutterFatalError(details);
+  }
+};
+
+PlatformDispatcher.instance.onError = (error, stack) {
+  final isRecoverable = _isRecoverableNetworkOrImageError(error);
+  FirebaseCrashlytics.instance.recordError(
+    error,
+    stack,
+    fatal: !isRecoverable,
+  );
+  return true;
+};
 
   runApp(MyApp(notificationService: notificationService));
 }
@@ -192,7 +216,7 @@ class MyApp extends StatelessWidget {
           ),
           BlocProvider(
             create: (context) => HomeCubit(
-              categoryRepository: CategoryRepository(Hive.box('myBox')),
+              categoryRepository: CategoryRepository(),
               locationService: LocationService(),
             ),
           ),
