@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:booking/presentaion/auth/cubit/auth_cubit.dart';
 import 'package:booking/presentaion/auth/cubit/auth_state.dart';
 import 'package:booking/presentaion/chat/cubit_chat/chat_cubit.dart';
@@ -24,6 +26,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  ChatMessage? _replyingTo;
   DateTime? _lastMarkedReadAt;
   late ChatCubit _chatCubit;
   late AuthCubit _authCubit;
@@ -58,6 +61,9 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  void _setReply(ChatMessage msg) => setState(() => _replyingTo = msg);
+  void _cancelReply() => setState(() => _replyingTo = null);
+
   void _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
@@ -70,9 +76,12 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
+    final reply = _replyingTo;
     _textController.clear();
+    setState(() => _replyingTo = null);
+
     try {
-      await _chatCubit.sendMessage(widget.chatId, authState.user.id, text);
+      await _chatCubit.sendMessage(widget.chatId, authState.user.id, text, replyTo: reply);
     } catch (e, stack) {
       print('Send error: $e\n$stack');
       ScaffoldMessenger.of(
@@ -81,6 +90,14 @@ class _ChatScreenState extends State<ChatScreen> {
       _textController.text = text;
     }
   }
+
+  void _sendImage(File file) {
+  final authState = _authCubit.state;
+  if (authState is! AuthAuthenticated) return;
+  final reply = _replyingTo;
+  setState(() => _replyingTo = null);
+  _chatCubit.sendImageMessage(widget.chatId, authState.user.id, file, replyTo: reply);
+}
 
   @override
   Widget build(BuildContext context) {
@@ -143,7 +160,7 @@ class _ChatScreenState extends State<ChatScreen> {
             },
             child: BlocBuilder<ChatCubit, ChatState>(
               builder: (context, state) {
-                final messages = state.messagesByChat[widget.chatId] ?? [];
+                final messages = state.messagesFor(widget.chatId);
                 final loading = state.messagesLoading[widget.chatId] ?? false;
                 if (loading && messages.isEmpty) {
                   return const Center(child: CircularProgressIndicator());
@@ -166,18 +183,39 @@ class _ChatScreenState extends State<ChatScreen> {
                           } else {
                             return MessageBubble(
                               message: item as ChatMessage,
-                              chatId: widget.chatId,
+                              chatId: widget.chatId, 
+                              onReply: _setReply,
                             );
                           }
                         },
                       ),
                     ),
+                    if (_replyingTo != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        color: Theme.of(context).colorScheme.surface,
+                        child: Row(
+                          children: [
+                            Container(width: 3, height: 36, color: colorScheme.primary),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _replyingTo!.type == MessageType.image ? '📷 Photo' : _replyingTo!.text,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            IconButton(icon: const Icon(Icons.close), onPressed: _cancelReply),
+                          ],
+                        ),
+                      ),
                     SafeArea(
                       child: MessageInput(
                         controller: _textController,
                         onSend: () {
                           _sendMessage();
-                        },
+                        }, 
+                        onImageSelected: _sendImage,
                       ),
                     ),
                   ],

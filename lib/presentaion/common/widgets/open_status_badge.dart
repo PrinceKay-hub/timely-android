@@ -94,7 +94,7 @@ class OpenStatusBadge extends StatelessWidget {
 
     bool isOpen = false;
     int? minutesUntilClose;
-    int? minutesUntilOpen;
+    int? minutesUntilOpen; // set only when the shop opens LATER TODAY
 
     // Check today's shift, and yesterday's shift if it's an overnight
     // shift that spills into today.
@@ -127,8 +127,10 @@ class OpenStatusBadge extends StatelessWidget {
         detail = 'Closes at ${_formatTime(endHour, endMinute)}';
       }
     } else if (!isOpen) {
-      if (minutesUntilOpen != null && minutesUntilOpen <= 60) {
-        detail = 'Opens in ${minutesUntilOpen}m';
+      if (minutesUntilOpen != null) {
+        detail = minutesUntilOpen <= 60
+            ? 'Opens in ${minutesUntilOpen}m'
+            : 'Opens today at ${_formatTime(startHour, startMinute)}';
       } else {
         final nextDay = _nextOpenDayLabel(days, todayIndex);
         detail = nextDay != null
