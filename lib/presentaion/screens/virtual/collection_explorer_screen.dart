@@ -419,6 +419,7 @@ class _ImageViewer extends StatefulWidget {
 
 class _ImageViewerState extends State<_ImageViewer> {
   late int _index = widget.initialIndex;
+  bool _isZoomed = false; // drives PageView physics
 
   @override
   Widget build(BuildContext context) {
@@ -428,29 +429,32 @@ class _ImageViewerState extends State<_ImageViewer> {
         children: [
           PageView.builder(
             controller: widget.controller,
+            physics: _isZoomed
+                ? const NeverScrollableScrollPhysics()
+                : null,
             itemCount: widget.collection.styles.length,
             onPageChanged: (i) {
-              setState(() => _index = i);
+              setState(() {
+                _index = i;
+                _isZoomed = false; // reset lock when landing on a fresh page
+              });
               widget.onIndexChanged(i);
             },
             itemBuilder: (context, i) {
-            final style = widget.collection.styles[i];
-            return CachedNetworkImage(
-              imageUrl: style.images.full,
-              fit: BoxFit.contain,
-              // low-res card image shows instantly while the full image loads
-              placeholder: (_, __) => CachedNetworkImage(
-                imageUrl: style.images.card,
-                fit: BoxFit.contain,
-                errorWidget: (_, __, ___) => const Center(
-                  child: Icon(Icons.broken_image, color: Colors.white, size: 48),
-                ),
-              ),
-              errorWidget: (_, __, ___) => const Center(
-                child: Icon(Icons.broken_image, color: Colors.white, size: 48),
-              ),
-            );
-          },
+              final style = widget.collection.styles[i];
+              return _ZoomableImage(
+                key: ValueKey(style.id ?? i),
+                imageUrl: style.images.full,
+                placeholderUrl: style.images.card,
+                onZoomChanged: (zoomed) {
+                  // Only let the currently active page control PageView's
+                  // physics — a neighboring pre-built page shouldn't matter.
+                  if (i == _index && zoomed != _isZoomed) {
+                    setState(() => _isZoomed = zoomed);
+                  }
+                },
+              );
+            },
           ),
           Positioned(
             top: 0,
@@ -517,6 +521,131 @@ class _ImageViewerState extends State<_ImageViewer> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A single full-screen image that supports pinch-to-zoom and
+/// double-tap-to-zoom, and reports its zoom state so the parent PageView
+/// can disable swipe-to-change-page while zoomed in.
+class _ZoomableImage extends StatefulWidget {
+  final String imageUrl;
+  final String placeholderUrl;
+  final ValueChanged<bool> onZoomChanged;
+
+  const _ZoomableImage({
+    super.key,
+    required this.imageUrl,
+    required this.placeholderUrl,
+    required this.onZoomChanged,
+  });
+
+  @override
+  State<_ZoomableImage> createState() => _ZoomableImageState();
+}
+
+class _ZoomableImageState extends State<_ZoomableImage>
+    with SingleTickerProviderStateMixin {
+  static const double _doubleTapZoomScale = 2.5;
+
+  late final TransformationController _controller;
+  late final AnimationController _animController;
+  Animation<Matrix4>? _zoomAnimation;
+  TapDownDetails? _doubleTapDetails;
+  bool _isZoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TransformationController();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    )..addListener(_onAnimTick);
+    _controller.addListener(_onTransformChanged);
+  }
+
+  void _onAnimTick() {
+    if (_zoomAnimation != null) {
+      _controller.value = _zoomAnimation!.value;
+    }
+  }
+
+  void _onTransformChanged() {
+    final zoomedNow = _controller.value.getMaxScaleOnAxis() > 1.01;
+    if (zoomedNow != _isZoomed) {
+      _isZoomed = zoomedNow;
+      widget.onZoomChanged(zoomedNow);
+    }
+  }
+
+  void _handleDoubleTapDown(TapDownDetails details) {
+    _doubleTapDetails = details;
+  }
+
+  void _handleDoubleTap() {
+    final currentScale = _controller.value.getMaxScaleOnAxis();
+
+    Matrix4 endMatrix;
+    if (currentScale > 1.01) {
+      // Already zoomed in -> zoom back out to fit
+      endMatrix = Matrix4.identity();
+    } else {
+      // Zoom in, centered on the tap position
+      final position = _doubleTapDetails?.localPosition ?? Offset.zero;
+      endMatrix = Matrix4.identity()
+        ..translate(
+          -position.dx * (_doubleTapZoomScale - 1),
+          -position.dy * (_doubleTapZoomScale - 1),
+        )
+        ..scale(_doubleTapZoomScale);
+    }
+
+    _zoomAnimation = Matrix4Tween(
+      begin: _controller.value,
+      end: endMatrix,
+    ).animate(
+      CurveTween(curve: Curves.easeOut).animate(_animController),
+    );
+
+    _animController.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.removeListener(_onTransformChanged);
+    _controller.dispose();
+    _animController.removeListener(_onAnimTick);
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onDoubleTapDown: _handleDoubleTapDown,
+      onDoubleTap: _handleDoubleTap,
+      child: InteractiveViewer(
+        transformationController: _controller,
+        panEnabled: true,
+        minScale: 1,
+        maxScale: 4,
+        child: CachedNetworkImage(
+          imageUrl: widget.imageUrl,
+          fit: BoxFit.contain,
+          // low-res card image shows instantly while the full image loads
+          placeholder: (_, __) => CachedNetworkImage(
+            imageUrl: widget.placeholderUrl,
+            fit: BoxFit.contain,
+            errorWidget: (_, __, ___) => const Center(
+              child: Icon(Icons.broken_image, color: Colors.white, size: 48),
+            ),
+          ),
+          errorWidget: (_, __, ___) => const Center(
+            child: Icon(Icons.broken_image, color: Colors.white, size: 48),
+          ),
+        ),
       ),
     );
   }

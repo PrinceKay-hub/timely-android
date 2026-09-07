@@ -16,17 +16,22 @@ class GalleryWidget extends StatefulWidget {
 }
 
 class _GalleryWidgetState extends State<GalleryWidget>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late PageController pageController;
   late TransformationController controller;
   late AnimationController animationController;
-  Animation<Matrix4>? animation;
+  Animation<Matrix4>? _zoomAnimation;
 
-  Offset _offset = Offset.zero; // Tracks image position
-  double _opacity = 1.0; // Background opacity
-  AnimationController? _returnController; // Handles return animation
+  static const double _doubleTapZoomScale = 2.5;
+  TapDownDetails? _doubleTapDetails;
+
+  Offset _offset = Offset.zero;
+  double _opacity = 1.0;
+  AnimationController? _returnController;
   late int count;
   double _rotationAngle = 0.0;
+
+  bool _isZoomed = false; // NEW: drives PageView physics
 
   @override
   void initState() {
@@ -37,6 +42,26 @@ class _GalleryWidgetState extends State<GalleryWidget>
     controller = TransformationController();
     animationController = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 200));
+    animationController.addListener(_onZoomAnimationTick);
+
+    // NEW: react to any transformation change, including pinch gestures
+    // driven internally by InteractiveViewer.
+    controller.addListener(_onTransformationChanged);
+  }
+
+  void _onTransformationChanged() {
+    final zoomedNow = controller.value.getMaxScaleOnAxis() > 1.01;
+    if (zoomedNow != _isZoomed) {
+      setState(() {
+        _isZoomed = zoomedNow;
+      });
+    }
+  }
+
+  void _onZoomAnimationTick() {
+    if (_zoomAnimation != null) {
+      controller.value = _zoomAnimation!.value;
+    }
   }
 
   void _rotateImage() {
@@ -46,14 +71,48 @@ class _GalleryWidgetState extends State<GalleryWidget>
     });
   }
 
-  @override
-  void dispose() {
-    pageController.dispose();
-    controller.dispose();
-    animationController.dispose();
-    _returnController?.dispose();
-    super.dispose();
+  void _handleDoubleTapDown(TapDownDetails details) {
+    _doubleTapDetails = details;
   }
+
+  void _handleDoubleTap() {
+    final currentScale = controller.value.getMaxScaleOnAxis();
+
+    Matrix4 endMatrix;
+    if (currentScale > 1.01) {
+      // Already zoomed in -> zoom back out to fit
+      endMatrix = Matrix4.identity();
+    } else {
+      // Zoom in, centered on the tap position
+      final position = _doubleTapDetails?.localPosition ?? Offset.zero;
+      endMatrix = Matrix4.identity()
+        ..translate(
+          -position.dx * (_doubleTapZoomScale - 1),
+          -position.dy * (_doubleTapZoomScale - 1),
+        )
+        ..scale(_doubleTapZoomScale);
+    }
+
+    _zoomAnimation = Matrix4Tween(
+      begin: controller.value,
+      end: endMatrix,
+    ).animate(
+      CurveTween(curve: Curves.easeOut).animate(animationController),
+    );
+
+    animationController.forward(from: 0);
+  }
+
+    @override
+    void dispose() {
+      pageController.dispose();
+      controller.removeListener(_onTransformationChanged);
+      controller.dispose();
+      animationController.removeListener(_onZoomAnimationTick);
+      animationController.dispose();
+      _returnController?.dispose();
+      super.dispose();
+    }
 
   @override
   Widget build(BuildContext context) {
@@ -108,6 +167,9 @@ class _GalleryWidgetState extends State<GalleryWidget>
       body: PageView.builder(
         scrollDirection: Axis.horizontal,
         controller: pageController,
+        // Disable page swiping while zoomed in so vertical/horizontal
+        // pan gestures on the zoomed image don't fight the PageView.
+        physics: _isZoomed ? const NeverScrollableScrollPhysics() : null,
         itemCount: widget.images.length,
         onPageChanged: (index) {
           setState(() {
@@ -122,21 +184,18 @@ class _GalleryWidgetState extends State<GalleryWidget>
               onVerticalDragStart: (_) => _cancelReturnAnimation(),
               onVerticalDragUpdate: (details) => _handleDragUpdate(details),
               onVerticalDragEnd: _handleDragEnd,
-              onTap: () => Navigator.pop(context),
+              onDoubleTapDown: _handleDoubleTapDown,
+              onDoubleTap: _handleDoubleTap,
               child: Container(
                 decoration: const BoxDecoration(color: Colors.black),
                 child: InteractiveViewer(
                   transformationController: controller,
-                  panEnabled: false,
+                  panEnabled: true,
                   minScale: 1,
                   maxScale: 4,
                   child: Container(
                     decoration: const BoxDecoration(color: Colors.black),
                     child: Builder(builder: (context) {
-                      // Size the decoded bitmap to the viewport rather than
-                      // a fixed guess, and preserve aspect ratio by setting
-                      // only one dimension (cached_network_image / ResizeImage
-                      // scales the other automatically).
                       final mq = MediaQuery.of(context);
                       final cacheWidth =
                           (mq.size.width * mq.devicePixelRatio * 2).round();
@@ -173,15 +232,15 @@ class _GalleryWidgetState extends State<GalleryWidget>
     );
   }
 
-  void _handleDragUpdate(DragUpdateDetails details) {
+    void _handleDragUpdate(DragUpdateDetails details) {
+    if (_isZoomed) return; // don't dismiss-drag while zoomed in
+
     final double newDy = _offset.dy + details.delta.dy;
 
-    // Block upward drag when at top position
     if (details.delta.dy < 0 && _offset.dy <= 0) {
-      return; // Ignore upward drag
+      return;
     }
 
-    // Allow downward drag in all cases
     setState(() {
       _offset = Offset(0, newDy);
       _opacity = (1 - newDy.clamp(0, 300) / 300).clamp(0.4, 1.0);
@@ -189,19 +248,16 @@ class _GalleryWidgetState extends State<GalleryWidget>
   }
 
   void _handleDragEnd(DragEndDetails _) {
-    // Snap back to top if dragged up from bottom
     if (_offset.dy < 0) {
       _animateBackToPosition(Offset.zero, 1.0);
       return;
     }
 
-    // Dismiss if dragged beyond threshold
     if (_offset.dy > 100) {
       Navigator.pop(context);
       return;
     }
 
-    // Animate back to top
     _animateBackToPosition(Offset.zero, 1.0);
   }
 

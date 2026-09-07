@@ -978,3 +978,121 @@ exports.updateServiceRating =
           throw error;
         }
       });
+
+
+exports.sendWeeklyFridayPromo =
+onSchedule({
+  schedule: "every friday 09:00",
+  timeZone: "Africa/Accra",
+}, async () => {
+  console.log("Running weekly Friday promo notification");
+
+  // Pull users who've opted into notifications
+  const snapshot = await db.collection("users")
+      .get();
+
+  if (snapshot.empty) {
+    console.log("No eligible users found.");
+    return null;
+  }
+
+  const promises = [];
+  snapshot.forEach((doc) => {
+    const userData = doc.data();
+    const userId = doc.id;
+    const fcmToken = userData ? userData.fcmToken : null;
+
+    if (!fcmToken) {
+      console.log(`No FCM token for user ${userId}`);
+      return;
+    }
+
+    const message = {
+      token: fcmToken,
+      notification: {
+        title: "Weekend slots are filling up 💇",
+        body: "Your favorite provider's weekend slots are filling fast.",
+      },
+      data: {
+        type: "weekly_promo",
+      },
+    };
+
+    const sendPromise = admin.messaging().send(message)
+        .then(() => {
+          console.log(`Promo sent to user ${userId}`);
+        })
+        .catch((error) => {
+          console.error(`Failed to send promo to user ${userId}:`, error);
+          // Clean up dead tokens so you're not sending to them forever
+          if (error.code === "messaging/registration-token-not-registered") {
+            return db.collection("users").doc(userId).update({
+              fcmToken: admin.firestore.FieldValue.delete(),
+            });
+          }
+        });
+
+    promises.push(sendPromise);
+  });
+
+  await Promise.allSettled(promises);
+  console.log("Weekly Friday promo function finished.");
+  return null;
+});
+
+exports.sendSundayPlanningReminder =
+onSchedule({
+  schedule: "every sunday 18:00",
+  timeZone: "Africa/Accra",
+}, async () => {
+  console.log("Running Sunday planning reminder");
+
+  const snapshot = await db.collection("users").get();
+
+  if (snapshot.empty) {
+    console.log("No users found.");
+    return null;
+  }
+
+  const promises = [];
+  snapshot.forEach((doc) => {
+    const userData = doc.data();
+    const userId = doc.id;
+    const fcmToken = userData ? userData.fcmToken : null;
+
+    if (!fcmToken) {
+      console.log(`No FCM token for user ${userId}`);
+      return;
+    }
+
+    const message = {
+      token: fcmToken,
+      notification: {
+        title: "New week, new look 💫",
+        body: "Beat the rush — book your slot for the week ahead now.",
+      },
+      data: {
+        type: "weekly_planning_reminder",
+      },
+    };
+
+    const sendPromise = admin.messaging().send(message)
+        .then(() => {
+          console.log(`Planning reminder sent to user ${userId}`);
+        })
+        .catch((error) => {
+          console.error(`Failed to send to user ${userId}:`, error);
+          if (error.code === "messaging/registration-token-not-registered") {
+            return db.collection("users").doc(userId).update({
+              fcmToken: admin.firestore.FieldValue.delete(),
+            });
+          }
+        });
+
+    promises.push(sendPromise);
+  });
+
+  await Promise.allSettled(promises);
+  console.log("Sunday planning reminder finished.");
+  return null;
+});
