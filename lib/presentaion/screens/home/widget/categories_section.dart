@@ -4,6 +4,7 @@ import 'package:booking/presentaion/screens/search/categorySearch.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:shimmer/shimmer.dart';
 
 class CategoriesSection extends StatelessWidget {
   final Map<String, dynamic> user;
@@ -25,12 +26,49 @@ class CategoriesSection extends StatelessWidget {
           );
         }
         if (state.categories.isEmpty) {
-          return const SizedBox.shrink();
+          return SizedBox(
+            height: 100,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              itemCount: 5,
+              itemBuilder: (context, i) => Shimmer.fromColors(
+                  baseColor: Theme.of(context).colorScheme.surfaceBright,
+                  highlightColor: Theme.of(context).colorScheme.surfaceDim,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      height: 60,
+                      width: 60,
+                      
+                    ),
+                  ),
+                ),
+            ),
+            ),
+          );
         }
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.onSecondary,
+          ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: const Text(
+                  'Categories',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
               SizedBox(
                 height: 100,
                 child: ListView.builder(
@@ -82,7 +120,21 @@ class CategoriesSection extends StatelessWidget {
               width: 50,
               fit: BoxFit.contain,
               memCacheWidth: 150,
-              placeholder: (context, url) => Icon(Icons.image_outlined, color: Theme.of(context).colorScheme.secondary,),
+              placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: Theme.of(context).colorScheme.surfaceBright,
+                  highlightColor: Theme.of(context).colorScheme.surfaceDim,
+                  child: Container(
+                    height: 50,
+                    width: 50,
+                    color: Colors.white,
+                  ),
+                ),
+                errorWidget: (_, __, ___) => Container(
+                  height: 50,
+                  width: 50,
+                  color: Colors.grey[300],
+                  child: const Icon(Icons.error),
+                ),
               ) 
             
           ),

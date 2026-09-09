@@ -326,6 +326,35 @@ onDocumentWritten("services/{serviceId}", async (event) => {
   }
 });
 
+/**
+ * Ensures every service document has a `randomValue` field, setting one
+ * whenever a document is created or updated without it. Runs on every
+ * write (create/update/delete), so it also backfills docs that get
+ * touched by unrelated updates after this function is deployed — but it
+ * will NOT retroactively touch untouched existing docs; run the one-time
+ * backfill script for those.
+ *
+ * @param {import("firebase-functions/v2/firestore").FirestoreEvent} event
+ *   The Firestore write event.
+ * @return {Promise<void>}
+ */
+exports.syncRandomValueOnCreate = onDocumentWritten(
+    {document: "services/{serviceId}", region: "us-central1"},
+    async (event) => {
+      const change = event.data;
+      if (!change) return;
+
+      // Document was deleted — nothing to do.
+      if (!change.after.exists) return;
+
+      // Guard against re-triggering / overwriting a value that's
+      // already set, and against looping on our own update() call.
+      if (change.after.data().randomValue !== undefined) return;
+
+      await change.after.ref.update({randomValue: Math.random()});
+    },
+);
+
 
 exports.syncUserData = onDocumentWritten("users/{userId}", async (event) => {
   const after = event.data?.after;
@@ -1096,3 +1125,132 @@ onSchedule({
   console.log("Sunday planning reminder finished.");
   return null;
 });
+
+
+const MAX_PAGE_LIMIT = 50;
+
+/**
+ * Builds the base Firestore query for approved, exclusive services.
+ * @return {FirebaseFirestore.Query} The base query.
+ */
+function baseQuery() {
+  return db
+      .collection("services")
+      .where("status", "==", "approved")
+      .where("isExclusive", "==", true);
+}
+
+/**
+ * Callable function that returns a randomized, paginated page of
+ * approved & exclusive services using a stored `randomValue` field
+ * for efficient, stable random pagination.
+ *
+ * Request data:
+ * - anchor {number} Random value (0-1) fixed for the whole session.
+ * - wrapped {boolean} Whether this session has already crossed the
+ *   wrap boundary (i.e. started reading values below the anchor).
+ * - lastRandomValue {number|null} Cursor from the previous page.
+ * - limit {number} Number of docs to return.
+ *
+ * @param {import("firebase-functions/v2/https").CallableRequest} request
+ *   The callable request.
+ * @return {Promise<{
+ *   items: Array<Object>,
+ *   hasMore: boolean,
+ *   wrapped: boolean,
+ *   lastRandomValue: number|null,
+ * }>} The page of results plus pagination cursors.
+ */
+
+exports.getServicesPage = onCall(
+    {region: "us-central1"},
+    async (request) => {
+      const {anchor, wrapped, lastRandomValue, limit} = request.data ?? {};
+
+      if (
+        typeof anchor !== "number" || anchor < 0 || anchor > 1 ||
+        typeof wrapped !== "boolean" ||
+        (lastRandomValue !== null && lastRandomValue !== undefined &&
+          typeof lastRandomValue !== "number") ||
+        typeof limit !== "number" || limit <= 0 || limit > MAX_PAGE_LIMIT
+      ) {
+        throw new HttpsError("invalid-argument", "Invalid request params.");
+      }
+
+      try {
+        const items = [];
+        let cursor = lastRandomValue ?? null;
+
+        // Phase 1: still in the "ahead of anchor" range.
+        if (!wrapped) {
+          let q = baseQuery()
+              .where("randomValue", ">=", anchor)
+              .orderBy("randomValue", "asc")
+              .orderBy("__name__", "asc") // tiebreaker for stable cursors
+              .limit(limit);
+
+          if (cursor !== null) {
+            q = q.startAfter(cursor);
+          }
+
+          const snap = await q.get();
+          snap.docs.forEach((d) => items.push({id: d.id, ...d.data()}));
+
+          if (items.length > 0) {
+            cursor = items[items.length - 1].randomValue;
+          }
+
+          // Ran out before filling the page -> wrap and fill the rest.
+          if (items.length < limit) {
+            const remaining = limit - items.length;
+
+            const wrapSnap = await baseQuery()
+                .where("randomValue", "<", anchor)
+                .orderBy("randomValue", "asc")
+                .orderBy("__name__", "asc")
+                .limit(remaining)
+                .get();
+
+            wrapSnap.docs.forEach((d) => items.push({id: d.id, ...d.data()}));
+            if (wrapSnap.docs.length > 0) {
+              cursor = items[items.length - 1].randomValue;
+            }
+
+            // If the wrap query also came up short, we've read everything.
+            const hasMore = wrapSnap.docs.length === remaining;
+            return {items, hasMore, wrapped: true, lastRandomValue: cursor};
+          }
+
+          return {items, hasMore: true,
+            wrapped: false, lastRandomValue: cursor};
+        }
+
+        // Phase 2: already wrapped, just keep paging through "< anchor".
+        let q = baseQuery()
+            .where("randomValue", "<", anchor)
+            .orderBy("randomValue", "asc")
+            .orderBy("__name__", "asc")
+            .limit(limit);
+
+        if (cursor !== null) {
+          q = q.startAfter(cursor);
+        }
+
+        const snap = await q.get();
+        snap.docs.forEach((d) => items.push({id: d.id, ...d.data()}));
+        if (items.length > 0) {
+          cursor = items[items.length - 1].randomValue;
+        }
+
+        return {
+          items,
+          hasMore: items.length === limit,
+          wrapped: true,
+          lastRandomValue: cursor,
+        };
+      } catch (e) {
+        console.error("getServicesPage error:", e);
+        throw new HttpsError("internal", "Failed to fetch service data.");
+      }
+    },
+);

@@ -11,13 +11,31 @@ final class ServiceDataInitial extends ServiceDataState {}
 
 final class ServiceDataLoading extends ServiceDataState {}
 
-final class ServiceDataLoaded extends ServiceDataState {
+class ServiceDataLoaded extends ServiceDataState {
   final List serviceData;
-
-  const ServiceDataLoaded(this.serviceData);
-
+  final bool hasMore;
+  final bool isLoadingMore;
+ 
+  const ServiceDataLoaded(
+    this.serviceData, {
+    this.hasMore = true,
+    this.isLoadingMore = false,
+  });
+ 
+  ServiceDataLoaded copyWith({
+    List? serviceData,
+    bool? hasMore,
+    bool? isLoadingMore,
+  }) {
+    return ServiceDataLoaded(
+      serviceData ?? this.serviceData,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    );
+  }
+ 
   @override
-  List<Object> get props => [serviceData];
+  List<Object> get props => [serviceData, hasMore, isLoadingMore];
 }
 
 final class ServiceByIdDataLoaded extends ServiceDataState {

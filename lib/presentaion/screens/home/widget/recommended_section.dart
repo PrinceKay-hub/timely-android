@@ -9,14 +9,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:shimmer/shimmer.dart';
 
 class RecommendedSection extends StatelessWidget {
-  const RecommendedSection({super.key, });
+  const RecommendedSection({super.key});
 
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<ServiceDataCubit, ServiceDataState>(
       builder: (context, state) {
         if (state is ServiceDataLoading) {
-          return Center(child: CircularProgressIndicator(strokeWidth: 2),);
+          return Center(child: CircularProgressIndicator(strokeWidth: 2));
         }
         if (state is ServiceDataLoaded) {
           final services = state.serviceData;
@@ -27,7 +27,24 @@ class RecommendedSection extends StatelessWidget {
             children: [
               const _ViewTypeSwitcher(),
               const SizedBox(height: 10),
-              _ServicesView(services: services,),
+              _ServicesView(services: services),
+              if (state.isLoadingMore)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              else if (!state.hasMore && services.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Center(
+                    child: Text(
+                      "You've reached the end",
+                      style: TextStyle(color: Colors.grey[500], fontSize: 13),
+                    ),
+                  ),
+                ),
               const SizedBox(height: 40),
             ],
           );
@@ -127,7 +144,7 @@ class _ViewTypeSwitcher extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: const Text(
-                  'Top services',
+                  'Exclusive services',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -178,7 +195,7 @@ class _ViewTypeSwitcher extends StatelessWidget {
 
 class _ServicesView extends StatelessWidget {
   final List<dynamic> services;
-  const _ServicesView({required this.services, });
+  const _ServicesView({required this.services});
 
   @override
   Widget build(BuildContext context) {
@@ -187,11 +204,11 @@ class _ServicesView extends StatelessWidget {
       builder: (context, state) {
         switch (state.viewType) {
           case ViewType.tile:
-            return _TileView(services: services,);
+            return _TileView(services: services);
           case ViewType.grid:
-            return _GridView(services: services, );
+            return _GridView(services: services);
           case ViewType.list:
-            return _ListView(services: services,);
+            return _ListView(services: services);
         }
       },
     );
@@ -216,14 +233,11 @@ class _TileView extends StatelessWidget {
     );
   }
 
-  Widget _buildTileItem(
-    BuildContext context,
-    Map<String, dynamic> item,
-  ) {
+  Widget _buildTileItem(BuildContext context, Map<String, dynamic> item) {
     var land = item['landmark'];
     var landmark = land != null ? ', $land' : '';
     return GestureDetector(
-      onTap: () => _navigateToDetail(context, item,),
+      onTap: () => _navigateToDetail(context, item),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -384,23 +398,18 @@ class _TileView extends StatelessWidget {
     );
   }
 
-  void _navigateToDetail(
-    BuildContext context,
-    Map<String, dynamic> item,
-  ) {
+  void _navigateToDetail(BuildContext context, Map<String, dynamic> item) {
     //context.push('/service/${item['id']}');
-   Navigator.push(
+    Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => DetailScreen(id: item['id']),
-      ),
+      MaterialPageRoute(builder: (context) => DetailScreen(id: item['id'])),
     );
   }
 }
 
 class _GridView extends StatelessWidget {
   final List<dynamic> services;
-  const _GridView({required this.services, });
+  const _GridView({required this.services});
 
   @override
   Widget build(BuildContext context) {
@@ -422,10 +431,7 @@ class _GridView extends StatelessWidget {
     );
   }
 
-  Widget _buildGridItem(
-    BuildContext context,
-    Map<String, dynamic> item,
-  ) {
+  Widget _buildGridItem(BuildContext context, Map<String, dynamic> item) {
     return GestureDetector(
       onTap: () => _navigateToDetail(context, item),
       child: Container(
@@ -533,15 +539,10 @@ class _GridView extends StatelessWidget {
     );
   }
 
-  void _navigateToDetail(
-    BuildContext context,
-    Map<String, dynamic> item,
-  ) {
+  void _navigateToDetail(BuildContext context, Map<String, dynamic> item) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => DetailScreen(id: item['id']),
-      ),
+      MaterialPageRoute(builder: (context) => DetailScreen(id: item['id'])),
     );
   }
 }
@@ -564,10 +565,7 @@ class _ListView extends StatelessWidget {
     );
   }
 
-  Widget _buildListItem(
-    BuildContext context,
-    Map<String, dynamic> item,
-  ) {
+  Widget _buildListItem(BuildContext context, Map<String, dynamic> item) {
     var land = item['landmark'];
     var landmark = land != null ? ', $land' : '';
     return GestureDetector(
@@ -602,7 +600,6 @@ class _ListView extends StatelessWidget {
                 width: 120,
                 fit: BoxFit.cover,
                 memCacheWidth: 240,
-                memCacheHeight: 240,
                 fadeInDuration: const Duration(milliseconds: 200),
                 placeholder: (context, url) => Shimmer.fromColors(
                   baseColor: Theme.of(context).colorScheme.surfaceBright,
@@ -673,15 +670,10 @@ class _ListView extends StatelessWidget {
     );
   }
 
-  void _navigateToDetail(
-    BuildContext context,
-    Map<String, dynamic> item,
-  ) {
+  void _navigateToDetail(BuildContext context, Map<String, dynamic> item) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => DetailScreen(id: item['id']),
-      ),
+      MaterialPageRoute(builder: (context) => DetailScreen(id: item['id'])),
     );
   }
 }

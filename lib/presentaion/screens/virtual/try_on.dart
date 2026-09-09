@@ -13,7 +13,7 @@ class MenuItemData {
   final IconData icon;
   final Color accent;
   final Color accentSoft;
-  final WidgetBuilder builder; // 👈 was: final String route;
+  final WidgetBuilder builder;
 
   const MenuItemData({
     required this.key,

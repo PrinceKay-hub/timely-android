@@ -12,6 +12,8 @@ import 'package:booking/presentaion/screens/home/detail_screen.dart';
 import 'package:booking/presentaion/screens/home/home_screen.dart';
 import 'package:booking/presentaion/screens/home_entry.dart';
 import 'package:booking/presentaion/screens/profile/profile_screen.dart';
+import 'package:booking/presentaion/screens/virtual/collection_explorer_screen.dart';
+import 'package:booking/presentaion/screens/virtual/virtual_try_on_screen.dart';
 import 'package:booking/routes/app_wrapper.dart';
 import 'package:booking/routes/go_router_refresh_stream.dart';
 import 'package:flutter/material.dart';
@@ -131,6 +133,16 @@ class AppRouter {
           path: '/profile',
           builder: (context, state) =>
               ProfileScreen(user: state.extra as Map<String, dynamic>),
+        ),
+        GoRoute(
+          path: '/hairstyles',
+          builder: (context, state) =>
+              CollectionsExplorerScreen(),
+        ),
+        GoRoute(
+          path: '/tryon',
+          builder: (context, state) =>
+              VirtualTryOnScreen(),
         ),
         // FIX: pageBuilder + explicit key tied to the :id param. Without
         // this, a GoRouter-triggered rebuild (e.g. from refreshListenable
