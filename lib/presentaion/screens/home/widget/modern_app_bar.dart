@@ -26,6 +26,7 @@ class ModernAppBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final greeting = _getTimeBasedGreeting();
     final authState = context.watch<AuthCubit>().state;
+    final _chatCubit = context.read<ChatCubit>();
     return SliverAppBar(
       toolbarHeight: 85,
       pinned: true,
@@ -89,7 +90,10 @@ class ModernAppBar extends StatelessWidget {
                   builder: (context, chatState) {
                     if (authState is! AuthAuthenticated) {
                       return const SizedBox.shrink();
+                    } else {
+                      _chatCubit.subscribeToChats(authState.user.id);
                     }
+                    
 
                     final unread = context.read<ChatCubit>().getTotalUnread(
                       authState.user.id,

@@ -92,7 +92,7 @@ class _DetailScreenState extends State<DetailScreen> {
   void shareProviderLink(String serviceId) {
     final deepLink = 'https://timelygh.com/service/$serviceId';
     SharePlus.instance.share(
-      ShareParams(text: 'Check out my services on Timely: $deepLink'),
+      ShareParams(text: "Hey, I found this venue on Timely, Ghana's #1 self-care marketplace. Check it out: $deepLink"),
     );
   }
 
@@ -142,7 +142,7 @@ class _DetailScreenState extends State<DetailScreen> {
         currentUserName: user['displayName'] ?? user['name'] ?? 'User',
         currentUserPhoto: user['photoURL'] ?? '',
         otherUserId: providerId,
-        otherUserName: data['name'] ?? 'Provider',
+        otherUserName: data['providerName'] ?? data['name'],
         otherUserPhoto:
             data['providerPhoto'] ??
             (data['images']?.isNotEmpty == true ? data['images'][0] : null),

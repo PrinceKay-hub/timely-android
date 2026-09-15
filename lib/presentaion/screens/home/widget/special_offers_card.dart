@@ -1,6 +1,7 @@
 import 'package:booking/presentaion/banner/cubit/banner_cubit.dart';
 import 'package:booking/presentaion/banner/cubit/banner_state.dart';
 import 'package:booking/presentaion/provider/pages/registration_screen.dart';
+import 'package:booking/presentaion/screens/shop/shop_screen.dart';
 import 'package:booking/presentaion/screens/virtual/collection_explorer_screen.dart';
 import 'package:booking/presentaion/screens/virtual/virtual_try_on_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -48,6 +49,7 @@ class SpecialOffersCard extends StatelessWidget {
         ),
       'tryon': (context) => const VirtualTryOnScreen(),
       'hairstyles': (context) => const CollectionsExplorerScreen(),
+      'shop': (context) => ShopScreen()
     };
   }
 

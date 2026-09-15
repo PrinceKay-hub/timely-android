@@ -25,7 +25,8 @@ class ServiceModel extends ServiceEntity {
     required super.number,
     required super.region,
     required super.district,
-    required super.landmark
+    required super.landmark,
+    required super.providerName
   });
 
   factory ServiceModel.fromJson(Map<String, dynamic> json) {
@@ -60,6 +61,7 @@ class ServiceModel extends ServiceEntity {
       region: json['region'] ?? '',
       district: json['district'] ?? '',
       landmark: json['landmark'] ?? '',
+      providerName: json['providerName'] ?? '',
     );
   }
 
@@ -87,7 +89,8 @@ class ServiceModel extends ServiceEntity {
       number: entity.number,
       region: entity.region,
       district: entity.district,
-      landmark: entity.landmark
+      landmark: entity.landmark,
+      providerName: entity.providerName
     );
   }
 
@@ -120,6 +123,7 @@ class ServiceModel extends ServiceEntity {
       'region': region,
       'district': district,
       'landmark': landmark,
+      'providerName': providerName
     };
   }
 
@@ -147,7 +151,8 @@ class ServiceModel extends ServiceEntity {
       number: number,
       region: region,
       district: district,
-      landmark: landmark
+      landmark: landmark,
+      providerName: providerName
     );
   }
 }

@@ -43,6 +43,7 @@ class ServiceRegistrationCubit extends Cubit<ServiceRegistrationState> {
     region: '',
     district: '',
     landmark: '',
+    providerName: ''
   );
 
   void _update(ServiceEntity Function(ServiceEntity) updater) {
@@ -101,7 +102,7 @@ class ServiceRegistrationCubit extends Cubit<ServiceRegistrationState> {
   void updateServiceLandmark(String landmark) =>
     _update((s) => s.copyWith(landmark: landmark));
   
-  Future<void> registerService(List<String> files, bool isProvider) async {
+  Future<void> registerService(List<String> files, bool isProvider, String providerName) async {
     print('registerService called with files: $files');
     emit(ServiceRegistrationLoading());
     try {
@@ -137,6 +138,7 @@ class ServiceRegistrationCubit extends Cubit<ServiceRegistrationState> {
         totalReviews: 0,
         createdAt: DateTime.now(),
         status: 'pending',
+        providerName: providerName
       );
 
       await serviceRepository.createService(service, isProvider);
@@ -240,7 +242,8 @@ class ServiceRegistrationCubit extends Cubit<ServiceRegistrationState> {
       number: '',
       region: '',
       district: '',
-      landmark: ''
+      landmark: '',
+      providerName: ''
     );
     _deletedImageUrls.clear();
     emit(ServiceRegistrationInitial());

@@ -2,15 +2,30 @@ const functions = require("firebase-functions");
 const {onDocumentCreated, onDocumentWritten} =
 require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
-const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {onCall, onRequest, HttpsError} =
+require("firebase-functions/v2/https");
 const {defineSecret} = require("firebase-functions/params");
 const {fal} = require("@fal-ai/client");
 const {geohashQueryBounds, distanceBetween, geohashForLocation} =
 require("geofire-common");
 const admin = require("firebase-admin");
-admin.initializeApp();
+const {S3Client, GetObjectCommand, PutObjectCommand,
+  DeleteObjectCommand, DeleteObjectsCommand} =
+require("@aws-sdk/client-s3");
+const {getSignedUrl} = require("@aws-sdk/s3-request-presigner");
+const sharp = require("sharp");
+const {randomUUID} = require("crypto");
 
+admin.initializeApp();
 const db = admin.firestore();
+
+// virtual tryon call function
+// const SEGMIND_API_KEY = defineSecret("SEGMIND_API_KEY");
+const FAL_API_KEY = defineSecret("FAL_API_KEY");
+
+// --- Secrets (same pattern as your existing fal.ai key) ---
+const b2KeyId = defineSecret("B2_KEY_ID");
+const b2AppKey = defineSecret("B2_APP_KEY");
 
 
 // This function sends a notification to a specific
@@ -351,7 +366,10 @@ exports.syncRandomValueOnCreate = onDocumentWritten(
       // already set, and against looping on our own update() call.
       if (change.after.data().randomValue !== undefined) return;
 
-      await change.after.ref.update({randomValue: Math.random()});
+      await change.after.ref.update({
+        randomValue: Math.random(),
+        isExclusive: false,
+      });
     },
 );
 
@@ -797,9 +815,6 @@ exports.computeServicePairs =
     return null;
   });
 
-
-// virtual tryon call function
-const FAL_API_KEY = defineSecret("FAL_API_KEY");
 
 exports.virtualHairstyleTryOn = onCall(
     {
@@ -1252,5 +1267,520 @@ exports.getServicesPage = onCall(
         console.error("getServicesPage error:", e);
         throw new HttpsError("internal", "Failed to fetch service data.");
       }
+    },
+);
+
+const HAIR_SWAP_PROMPT =
+  "Using image 1 as the base image, give the person the exact hairstyle " +
+  "from image 2. Keep the face, skin tone, expression, pose, clothing, " +
+  "and background from image 1 completely unchanged.";
+
+
+exports.virtualHairstyleFalSegmindTryOn = onCall(
+    {
+      secrets: [FAL_API_KEY],
+      timeoutSeconds: 60,
+      memory: "512MiB",
+    },
+    async (request) => {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "You must be logged in.");
+      }
+
+      const uid = request.auth.uid;
+      const {userImageBase64, hairstyleImageBase64, styleName, category} =
+      request.data;
+
+      if (!userImageBase64 || !hairstyleImageBase64) {
+        throw new HttpsError(
+            "invalid-argument",
+            "Both userImageBase64 and hairstyleImageBase64 are required.",
+        );
+      }
+
+      // ── Usage Limit Check (3 Free Per Day) ──────────────────
+      const DAILY_LIMIT = 3;
+      const today = new Date().toISOString().split("T")[0];
+      const usageRef = admin
+          .firestore()
+          .collection("tryOnUsage")
+          .doc(uid)
+          .collection("daily")
+          .doc(today);
+
+      const usageSnap = await usageRef.get();
+      const currentCount = usageSnap.exists ? usageSnap.data().count : 0;
+
+      if (currentCount >= DAILY_LIMIT) {
+        throw new HttpsError(
+            "resource-exhausted",
+            "Daily limit reached for today.",
+        );
+      }
+
+      // Increment daily usage count
+      await usageRef.set(
+          {
+            count: admin.firestore.FieldValue.increment(1),
+            lastUsed: admin.firestore.FieldValue.serverTimestamp(),
+            uid: uid,
+            date: today,
+          },
+          {merge: true},
+      );
+
+      const apiKey = FAL_API_KEY.value();
+      fal.config({credentials: apiKey});
+
+      try {
+      // Upload Base64 images to Fal storage
+        const userBuffer = Buffer.from(userImageBase64, "base64");
+        const userFile = new File([userBuffer], "user.jpg",
+            {type: "image/jpeg"});
+        const userUrl = await fal.storage.upload(userFile);
+
+        const hairBuffer = Buffer.from(hairstyleImageBase64, "base64");
+        const hairFile = new File([hairBuffer], "hair.jpg",
+            {type: "image/jpeg"});
+        const hairUrl = await fal.storage.upload(hairFile);
+
+        // Construct your deployed falWebhook URL
+        const webhookUrl =
+      `https://us-central1-booking-cd20f.cloudfunctions.net/falWebhook`;
+
+        // Submit request to fal.ai Queue with webhook URL attached
+        const result = await fal.queue.submit("fal-ai/hy-wu-edit", {
+          input: {
+            prompt: HAIR_SWAP_PROMPT,
+            image_urls: [userUrl, hairUrl],
+            image_size: "auto",
+            num_images: 1,
+            output_format: "png",
+            enable_thinking: false,
+            num_inference_steps: 25,
+          },
+          webhookUrl: webhookUrl,
+        });
+
+        await admin.firestore().collection("users").doc(uid)
+            .collection("pendingTryOns").doc(result.request_id).set({
+              status: "PROCESSING",
+              requestId: result.request_id,
+              styleName: styleName || "Custom Style",
+              category: category || "Custom",
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+        // Return immediately to React Native (under 3 seconds execution time)
+        return {
+          success: true,
+          status: "PROCESSING",
+          requestId: result.request_id,
+          remainingToday: DAILY_LIMIT - (currentCount + 1),
+        };
+      } catch (error) {
+      // Rollback usage limit increment if submit fails
+        await usageRef.set(
+            {count: admin.firestore.FieldValue.increment(-1)},
+            {merge: true},
+        );
+        console.error("Submit Queue Error:", error);
+        throw new HttpsError("internal", error.message ||
+          "Failed to start try-on processing");
+      }
+    },
+);
+
+// 2. WEBHOOK FUNCTION (Called by fal.ai when generation finishes)
+exports.falWebhook = onRequest(
+    {
+      secrets: [FAL_API_KEY],
+      memory: "256MiB",
+    },
+    async (req, res) => {
+      try {
+        const {request_id: requestId, status, payload, error} = req.body;
+
+        // Find pending task record across users using requestId
+        const pendingSnap = await admin
+            .firestore()
+            .collectionGroup("pendingTryOns")
+            .where("requestId", "==", requestId)
+            .get();
+
+        if (pendingSnap.empty) {
+          console.warn(`No pending request found for ID: ${requestId}`);
+          return res.status(200).send("No matching pending task found");
+        }
+
+        const pendingDoc = pendingSnap.docs[0];
+        const pendingData = pendingDoc.data();
+        const userRef = pendingDoc.ref.parent.parent;
+
+        if (status === "OK" && payload?.images?.[0]?.url) {
+          const outputImageUrl = payload.images[0].url;
+
+          // Save generated image directly into user's Firestore tryOnHistory
+          await userRef.collection("tryOnHistory").add({
+            imageUrl: outputImageUrl,
+            styleName: pendingData.styleName,
+            category: pendingData.category,
+            savedAt: admin.firestore.FieldValue.serverTimestamp(),
+            requestId: requestId,
+          });
+
+          // Clean up pending document
+          await pendingDoc.ref.delete();
+
+          return res.status(200).send("Successfully saved try-on image");
+        } else {
+          console.error(`Fal execution failed for ${requestId}:`,
+              error || "Unknown error");
+
+          // Roll back usage count if fal generation failed
+          const today = new Date().toISOString().split("T")[0];
+          await admin
+              .firestore()
+              .collection("tryOnUsage")
+              .doc(userRef.id)
+              .collection("daily")
+              .doc(today)
+              .set({count: admin.firestore.FieldValue.increment(-1)},
+                  {merge: true});
+
+          await pendingDoc.ref.update({status: "FAILED",
+            error: error || "Generation failed"});
+          return res.status(200).send("Handled job failure");
+        }
+      } catch (err) {
+        console.error("Webhook processing error:", err);
+        return res.status(500).send("Internal Server Error");
+      }
+    },
+);
+
+
+// Non-secret config — plain values, no defineSecret needed
+const B2_ENDPOINT = "s3.us-east-005.backblazeb2.com";
+const B2_BUCKET = "timely-shop-products";
+const SHOP_CDN_BASE_URL = "https://shop-images.timelygh.com";
+const VALID_CATEGORIES = [
+  "hair", "nails", "skincare", "makeup",
+  "barbering", "tools", "fragrance", "bundles",
+];
+
+/**
+ * Creates an S3-compatible client configured for Backblaze B2.
+ * @return {S3Client} A configured S3 client instance.
+ */
+function getB2Client() {
+  return new S3Client({
+    endpoint: `https://${B2_ENDPOINT}`,
+    region: "us-west-002",
+    credentials: {
+      accessKeyId: b2KeyId.value(),
+      secretAccessKey: b2AppKey.value(),
+    },
+  });
+}
+
+// --- getUploadUrl ---
+exports.getUploadUrl = onCall(
+    {region: "us-central1", secrets: [b2KeyId, b2AppKey]},
+    async (request) => {
+      const uid = request.auth && request.auth.uid;
+      if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
+
+      const {files} = request.data;
+      if (!Array.isArray(files) || files.length < 1 || files.length > 5) {
+        throw new HttpsError("invalid-argument", "Provide 1-5 files.");
+      }
+
+      const b2 = getB2Client();
+      const allowedTypes = ["image/webp", "image/jpeg", "image/png"];
+
+      const uploads = await Promise.all(files.map(async ({contentType}) => {
+        if (!allowedTypes.includes(contentType)) {
+          throw new
+          HttpsError("invalid-argument", `Unsupported type: ${contentType}`);
+        }
+        const ext = contentType.split("/")[1];
+        const key = `products/${uid}/${Date.now()}-${randomUUID()}.${ext}`;
+        const command = new PutObjectCommand({
+          Bucket: B2_BUCKET, Key: key, ContentType: contentType,
+        });
+        const uploadUrl = await getSignedUrl(b2, command, {expiresIn: 300});
+        return {key, uploadUrl, contentType};
+      }));
+
+      return {uploads};
+    },
+);
+
+// --- createProduct ---
+exports.createProduct = onCall(
+    {region: "us-central1", secrets: [b2KeyId, b2AppKey]},
+    async (request) => {
+      const uid = request.auth && request.auth.uid;
+      if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
+
+      const {
+        name, description, price, category, tags, sellerName,
+        imageKeys, isDelivery, location, contact,
+      } = request.data;
+
+      if (!name || !price || !category ||
+        !VALID_CATEGORIES.includes(category)) {
+        throw new
+        HttpsError("invalid-argument", "Missing or invalid product fields.");
+      }
+      if (!Array.isArray(imageKeys) || imageKeys.length < 1 ||
+      imageKeys.length > 5) {
+        throw new HttpsError("invalid-argument", "Provide 1-5 image keys.");
+      }
+
+      // stays predictable and a seller can't spam hundreds of tags.
+      const normalizedTags = Array.isArray(tags) ?
+        [...new Set(
+            tags
+                .filter((t) => typeof t === "string" && t.trim().length > 0)
+                .map((t) => t.trim().toLowerCase())
+                .slice(0, 15),
+        )] :
+        [];
+
+      const b2 = getB2Client();
+      const thumbnailKey = `thumbnails/${uid}/${Date.now()}.webp`;
+
+      try {
+        const original = await b2.send(new GetObjectCommand({
+          Bucket: B2_BUCKET, Key: imageKeys[0],
+        }));
+        const buffer = Buffer.from(await original.Body.transformToByteArray());
+        const thumbnail = await sharp(buffer)
+            .resize(400, 400, {fit: "cover"})
+            .webp({quality: 75})
+            .toBuffer();
+
+        await b2.send(new PutObjectCommand({
+          Bucket: B2_BUCKET, Key: thumbnailKey,
+          Body: thumbnail, ContentType: "image/webp",
+        }));
+      } catch (err) {
+        console.error("Thumbnail generation failed:", err);
+        throw new HttpsError("internal", "Could not process product images.");
+      }
+
+      const productRef = db.collection("products").doc();
+      await productRef.set({
+        productId: productRef.id,
+        sellerId: uid,
+        sellerName: sellerName,
+        name,
+        description: description || "",
+        price,
+        currency: "GHS",
+        category,
+        tags: normalizedTags,
+        images: imageKeys.map((key) => `${SHOP_CDN_BASE_URL}/${key}`),
+        thumbnailUrl: `${SHOP_CDN_BASE_URL}/${thumbnailKey}`,
+        status: "pending",
+        contact,
+        isDelivery: isDelivery || false,
+        location: location || null,
+        viewCount: 0,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {
+        productId: productRef.id,
+        thumbnailUrl: `${SHOP_CDN_BASE_URL}/${thumbnailKey}`,
+      };
+    },
+);
+
+/**
+ * Strips the CDN base URL off a stored image/thumbnail URL to recover
+ * the underlying B2 object key.
+ * @param {string} url Full CDN URL, e.g. `${SHOP_CDN_BASE_URL}/products/...`
+ * @return {string} The B2 object key.
+ */
+function keyFromCdnUrl(url) {
+  return url.replace(`${SHOP_CDN_BASE_URL}/`, "");
+}
+
+// --- deleteProduct ---
+exports.deleteProduct = onCall(
+    {region: "us-central1", secrets: [b2KeyId, b2AppKey]},
+    async (request) => {
+      const uid = request.auth && request.auth.uid;
+      if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
+
+      const {productId} = request.data;
+      if (!productId || typeof productId !== "string") {
+        throw new HttpsError("invalid-argument", "Missing productId.");
+      }
+
+      const productRef = db.collection("products").doc(productId);
+      const snap = await productRef.get();
+      if (!snap.exists) {
+        throw new HttpsError("not-found", "Listing not found.");
+      }
+
+      const product = snap.data();
+      if (product.sellerId !== uid) {
+        throw new
+        HttpsError("permision-denied", "You can only delete your own listings");
+      }
+
+      const keysToDelete = [
+        ...(product.images || []).map(keyFromCdnUrl),
+        ...(product.thumbnailUrl ? [keyFromCdnUrl(product.thumbnailUrl)] : []),
+      ];
+
+      if (keysToDelete.length > 0) {
+        const b2 = getB2Client();
+        try {
+          await b2.send(new DeleteObjectsCommand({
+            Bucket: B2_BUCKET,
+            Delete: {Objects: keysToDelete.map((Key) => ({Key}))},
+          }));
+        } catch (err) {
+          // Log but don't block the Firestore delete on a storage hiccup —
+          // an orphaned B2 object is recoverable, a listing stuck in
+          // Firestore forever is a worse user-facing failure.
+          console.error("Failed to delete B2 objects for", productId, err);
+        }
+      }
+
+      await productRef.delete();
+
+      return {success: true};
+    },
+);
+
+// --- updateProduct ---
+exports.updateProduct = onCall(
+    {region: "us-central1", secrets: [b2KeyId, b2AppKey]},
+    async (request) => {
+      const uid = request.auth && request.auth.uid;
+      if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
+
+      const {
+        productId, name, description, price, category, tags,
+        images, newImageKeys, isDelivery, location, contact,
+      } = request.data;
+
+      if (!productId || typeof productId !== "string") {
+        throw new HttpsError("invalid-argument", "Missing productId.");
+      }
+      if (!name || !price || !category ||
+        !VALID_CATEGORIES.includes(category)) {
+        throw new
+        HttpsError("invalid-argument", "Missing or invalid product fields.");
+      }
+
+      const productRef = db.collection("products").doc(productId);
+      const snap = await productRef.get();
+      if (!snap.exists) {
+        throw new HttpsError("not-found", "Listing not found.");
+      }
+
+      const existing = snap.data();
+      if (existing.sellerId !== uid) {
+        throw new
+        HttpsError("permission-denied", "You can only edit your own listings.");
+      }
+
+      const keptImages = Array.isArray(images) ? images : [];
+      const newKeys = Array.isArray(newImageKeys) ? newImageKeys : [];
+      const finalImages = [
+        ...keptImages,
+        ...newKeys.map((key) => `${SHOP_CDN_BASE_URL}/${key}`),
+      ];
+
+      if (finalImages.length < 1 || finalImages.length > 5) {
+        throw new HttpsError("invalid-argument", "Provide 1-5 images.");
+      }
+
+      const normalizedTags = Array.isArray(tags) ?
+        [...new Set(
+            tags
+                .filter((t) => typeof t === "string" && t.trim().length > 0)
+                .map((t) => t.trim().toLowerCase())
+                .slice(0, 15),
+        )] :
+        [];
+
+      // Images that were on the product before but aren't in the kept list
+      // anymore — safe to delete from B2.
+      const removedImageKeys = (existing.images || [])
+          .filter((url) => !keptImages.includes(url))
+          .map(keyFromCdnUrl);
+
+      const b2 = getB2Client();
+
+      // Regenerate the thumbnail only if the first image actually changed —
+      // avoids a pointless resize/upload on edits that don't touch photos.
+      let thumbnailUrl = existing.thumbnailUrl;
+      if (finalImages[0] !== existing.images?.[0]) {
+        const firstKey = keyFromCdnUrl(finalImages[0]);
+        const newThumbnailKey = `thumbnails/${uid}/${Date.now()}.webp`;
+
+        try {
+          const original = await b2.send(new GetObjectCommand({
+            Bucket: B2_BUCKET, Key: firstKey,
+          }));
+          const buffer =
+            Buffer.from(await original.Body.transformToByteArray());
+          const thumbnail = await sharp(buffer)
+              .resize(400, 400, {fit: "cover"})
+              .webp({quality: 75})
+              .toBuffer();
+
+          await b2.send(new PutObjectCommand({
+            Bucket: B2_BUCKET, Key: newThumbnailKey,
+            Body: thumbnail, ContentType: "image/webp",
+          }));
+
+          if (existing.thumbnailUrl) {
+            const oldThumbnailKey = keyFromCdnUrl(existing.thumbnailUrl);
+            b2.send(new DeleteObjectCommand({
+              Bucket: B2_BUCKET, Key: oldThumbnailKey,
+            })).catch((err) =>
+              console.error("Failed to delete old thumbnail:", err));
+          }
+
+          thumbnailUrl = `${SHOP_CDN_BASE_URL}/${newThumbnailKey}`;
+        } catch (err) {
+          console.error("Thumbnail regeneration failed:", err);
+          throw new HttpsError("internal", "Could not process product images.");
+        }
+      }
+
+      if (removedImageKeys.length > 0) {
+        b2.send(new DeleteObjectsCommand({
+          Bucket: B2_BUCKET,
+          Delete: {Objects: removedImageKeys.map((Key) => ({Key}))},
+        })).catch((err) =>
+          console.error("Failed to delete removed B2 images:", err));
+      }
+
+      await productRef.update({
+        name,
+        description: description || "",
+        price,
+        category,
+        tags: normalizedTags,
+        images: finalImages,
+        thumbnailUrl,
+        contact: contact || "",
+        isDelivery: isDelivery || false,
+        location: location || null,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return {productId, thumbnailUrl};
     },
 );

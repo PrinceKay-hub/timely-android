@@ -10,6 +10,7 @@ import 'package:booking/presentaion/provider/pages/steps/location_step.dart';
 import 'package:booking/presentaion/provider/pages/steps/photos_step.dart';
 import 'package:booking/presentaion/provider/pages/steps/services_step.dart';
 import 'package:booking/presentaion/provider/pages/steps/working_hours_step.dart';
+import 'package:booking/presentaion/user/cubit/user_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -47,7 +48,7 @@ class _ServiceFormState extends State<ServiceForm> {
     }
   }
 
-  void _nextStep() {
+  void _nextStep(String name) {
     if (_currentStep < _totalSteps - 1) {
       setState(() => _currentStep++);
       _pageController.animateToPage(
@@ -56,11 +57,11 @@ class _ServiceFormState extends State<ServiceForm> {
         curve: Curves.easeInOut,
       );
     } else {
-      _submit();
+      _submit(name);
     }
   }
 
-  void _submit() {
+  void _submit(String pName) {
     final cubit = context.read<ServiceRegistrationCubit>();
     final imageFiles = PhotosStep.imageFilesOf(context);
 
@@ -70,7 +71,7 @@ class _ServiceFormState extends State<ServiceForm> {
       }
       cubit.updateService(imageFiles);
     } else {
-      cubit.registerService(imageFiles, widget.isProvider!);
+      cubit.registerService(imageFiles, widget.isProvider!,pName);
     }
   }
 
@@ -103,7 +104,9 @@ class _ServiceFormState extends State<ServiceForm> {
       case 2:
         return service.description.length >= 50;
       case 3:
-        return service.location.isNotEmpty && service.number.isNotEmpty && service.landmark.isNotEmpty;
+        return service.location.isNotEmpty &&
+            service.number.isNotEmpty &&
+            service.landmark.isNotEmpty;
       case 4:
         final startMin =
             service.workingHours.startHour * 60 +
@@ -181,7 +184,9 @@ class _ServiceFormState extends State<ServiceForm> {
                           });
                         },
                         onDeleteExistingImage: (imageUrl) {
-                          context.read<ServiceRegistrationCubit>().markImageForDeletion(imageUrl);
+                          context
+                              .read<ServiceRegistrationCubit>()
+                              .markImageForDeletion(imageUrl);
                         },
                       ),
                     ],
@@ -267,30 +272,40 @@ class _ServiceFormState extends State<ServiceForm> {
           ),
         ],
       ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _canProceed(service) ? _nextStep : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.primary,
-              disabledBackgroundColor: Colors.grey[300],
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+      child: BlocBuilder<UserCubit, UserState>(
+        builder: (BuildContext context, UserState state) {
+          if (state is UserLoaded) {
+            final user = state.user;
+            return SafeArea(
+              top: false,
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _canProceed(service)
+                      ? () => _nextStep(user['displayName'])
+                      : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    disabledBackgroundColor: Colors.grey[300],
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    _currentStep == _totalSteps - 1 ? 'Submit' : 'Continue',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            child: Text(
-              _currentStep == _totalSteps - 1 ? 'Submit' : 'Continue',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ),
+            );
+          }
+          return SizedBox.shrink();
+        },
       ),
     );
   }

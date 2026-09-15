@@ -1,7 +1,28 @@
+// NOTE: This screen assumes `HairstyleOption` (hairstyle_model.dart) has two
+// additional optional fields to support the custom-upload tile added in the
+// RN version:
+//   final bool isCustom;   // defaults to false
+//   final String? base64;  // local base64 for a user-uploaded reference image
+// Add them to the model (and its constructor / fromFirestore) if they're not
+// already there, e.g.:
+//   HairstyleOption({
+//     required this.id,
+//     required this.name,
+//     required this.category,
+//     required this.imageUrl,
+//     this.gender,
+//     this.type,
+//     this.targetHairstyle,
+//     this.hairColor,
+//     this.order,
+//     this.isCustom = false,
+//     this.base64,
+//   });
+
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:booking/data/models/hairstyle_model.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -23,17 +44,17 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   String? imageBase64;
   String? imageUri;
   HairstyleOption? selectedStyle;
+  String? customHairBase64;
   String? resultUrl;
   bool loading = false;
   bool loadingStyles = true;
-  bool saving = false;
   bool fullScreenVisible = false;
   bool transferring = false;
-  bool saved = false;
   String activeCategory = 'All';
   String gender = 'female';
   String styleType = 'hairstyle';
   List<HairstyleOption> hairstyles = [];
+  String? activeRequestId;
 
   // Usage tracking
   int usedToday = 0;
@@ -45,16 +66,22 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
   final GlobalKey _resultKey = GlobalKey();
   late Stream<QuerySnapshot> _hairstyleStream;
 
+  StreamSubscription<QuerySnapshot>? _historySub;
+  StreamSubscription<DocumentSnapshot>? _pendingSub;
+
   @override
   void initState() {
     super.initState();
     _fetchUsage();
     _buildStream();
+    _restoreSession();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _historySub?.cancel();
+    _pendingSub?.cancel();
     super.dispose();
   }
 
@@ -79,7 +106,55 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     }
   }
 
-  // ── Firestore stream ───────────────────────────────────────────────────────
+  // ── Restore in-flight / latest result on mount ───────────────────────────────
+  Future<void> _restoreSession() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      // 1. Check if there is an in-flight pending task for this user
+      final pendingSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .collection('pendingTryOns')
+          .where('status', isEqualTo: 'PROCESSING')
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (pendingSnap.docs.isNotEmpty) {
+        final pendingData = pendingSnap.docs.first.data();
+        final targetRequestId = pendingData['requestId'] as String;
+
+        if (mounted) {
+          setState(() {
+            loading = true;
+            activeRequestId = targetRequestId;
+          });
+        }
+
+        _listenForResult(uid, targetRequestId);
+      } else {
+        // 2. No pending task — load the user's latest generated image (if available)
+        final historySnap = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .collection('tryOnHistory')
+            .orderBy('savedAt', descending: true)
+            .limit(1)
+            .get();
+
+        if (historySnap.docs.isNotEmpty && mounted) {
+          final latest = historySnap.docs.first.data();
+          setState(() => resultUrl = latest['imageUrl'] as String?);
+        }
+      }
+    } catch (e) {
+      debugPrint('Error restoring try-on state: $e');
+    }
+  }
+
+  // ── Firestore stream (hairstyle catalog) ───────────────────────────────────
   void _buildStream() {
     _hairstyleStream = FirebaseFirestore.instance
         .collection('hairstyles')
@@ -101,79 +176,81 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     });
   }
 
-  // ── Image picker ───────────────────────────────────────────────────────────
+  // ── Image pickers ──────────────────────────────────────────────────────────
   Future<void> _pickImage() async {
     final ImageSource? source = await showModalBottomSheet<ImageSource>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(bottom: 8),
-              child: Text(
-                'Upload your photo',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-              ),
-            ),
-            const Divider(),
-            ListTile(
-              leading: Container(
-                width: 42,
-                height: 42,
+      builder: (_) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.camera_alt_outlined,
-                  color: Colors.purple,
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              title: const Text(
-                'Take a photo',
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: const Text('Use your camera'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
-            ListTile(
-              leading: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(
-                  Icons.photo_library_outlined,
-                  color: Colors.blue,
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Upload your photo',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
               ),
-              title: const Text(
-                'Choose from gallery',
-                style: TextStyle(fontWeight: FontWeight.w600),
+              const Divider(),
+              ListTile(
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.purple.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_outlined,
+                    color: Colors.purple,
+                  ),
+                ),
+                title: const Text(
+                  'Take a photo',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text('Use your camera'),
+                onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
-              subtitle: const Text('Pick an existing photo'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
-            ),
-            const SizedBox(height: 16),
-          ],
+              ListTile(
+                leading: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_outlined,
+                    color: Colors.blue,
+                  ),
+                ),
+                title: const Text(
+                  'Choose from gallery',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text('Pick an existing photo'),
+                onTap: () => Navigator.pop(context, ImageSource.gallery),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -203,131 +280,188 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     }
   }
 
-  // ── Try On retry ─────────────────────────────────────────────────────────────────
+  Future<void> _pickCustomHairstyleImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
 
-  Future<String> _saveFalImageToStorage(
-    String falUrl, {
-    int retries = 3,
-  }) async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) throw Exception('Not authenticated');
+    final bytes = await picked.readAsBytes();
+    final b64 = base64Encode(bytes);
 
-    for (int attempt = 1; attempt <= retries; attempt++) {
-      try {
-        debugPrint('Fetching fal.ai image, attempt $attempt...');
-        final response = await http
-            .get(Uri.parse(falUrl), headers: {'Cache-Control': 'no-cache'})
-            .timeout(const Duration(seconds: 30));
+    final customOption = HairstyleOption(
+      id: 'custom_upload',
+      name: 'Custom Reference',
+      category: 'Custom',
+      imageUrl: picked.path,
+      isCustom: true,
+      base64: b64,
+    );
 
-        if (response.statusCode != 200) {
-          throw Exception('HTTP ${response.statusCode}');
+    setState(() {
+      customHairBase64 = b64;
+      selectedStyle = customOption;
+      resultUrl = null;
+    });
+  }
+
+  // ── Result listeners ───────────────────────────────────────────────────────
+  void _listenForResult(String uid, String requestId) {
+    _historySub?.cancel();
+    _pendingSub?.cancel();
+
+    // Listen to the user's tryOnHistory filtered for this requestId
+    _historySub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('tryOnHistory')
+        .where('requestId', isEqualTo: requestId)
+        .snapshots()
+        .listen(
+      (snapshot) {
+        if (snapshot.docs.isEmpty) return;
+        final data = snapshot.docs.first.data();
+        final url = data['imageUrl'] as String?;
+        if (url == null || !mounted) return;
+
+        setState(() {
+          resultUrl = url;
+          loading = false;
+          transferring = false;
+        });
+        _fetchUsage();
+
+        _pendingSub?.cancel();
+        _historySub?.cancel();
+
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final ctx = _resultKey.currentContext;
+          if (ctx != null) {
+            Scrollable.ensureVisible(
+              ctx,
+              duration: const Duration(milliseconds: 600),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      },
+      onError: (e) {
+        debugPrint('Firestore history listener error: $e');
+        _pendingSub?.cancel();
+        _historySub?.cancel();
+        if (mounted) {
+          setState(() => loading = false);
+          _showAlert('Error', 'Failed to retrieve generated hairstyle result.');
         }
+      },
+    );
 
-        final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final storageRef = FirebaseStorage.instance.ref().child(
-          'tryOnResults/$uid/$timestamp.jpg',
-        );
-
-        await storageRef.putData(
-          response.bodyBytes,
-          SettableMetadata(contentType: 'image/jpeg'),
-        );
-
-        return await storageRef.getDownloadURL();
-      } catch (e) {
-        debugPrint('Attempt $attempt failed: $e');
-        if (attempt == retries) rethrow;
-        // Wait before retry: 2s, 4s, 6s
-        await Future.delayed(Duration(seconds: attempt * 2));
+    // Listen directly to pendingTryOns to catch processing errors if the job fails
+    _pendingSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .collection('pendingTryOns')
+        .doc(requestId)
+        .snapshots()
+        .listen((docSnap) {
+      if (docSnap.exists && docSnap.data()?['status'] == 'FAILED') {
+        _pendingSub?.cancel();
+        _historySub?.cancel();
+        if (mounted) {
+          setState(() => loading = false);
+          _showAlert(
+            'Try-On Failed',
+            (docSnap.data()?['error'] as String?) ?? 'Generation failed.',
+          );
+        }
       }
-    }
-    throw Exception('All retry attempts failed');
+    });
   }
 
   // ── Try On ─────────────────────────────────────────────────────────────────
   Future<void> _runTryOn() async {
-    if (imageBase64 == null || selectedStyle == null) return;
-    if (limitReached) {
+    // 1. Guard check for required base image and style selection
+    if (imageBase64 == null || selectedStyle == null) {
       _showAlert(
-        'Daily Limit Reached',
-        "You've used all 3 free try-ons for today. Come back tomorrow!",
+        'Missing Information',
+        'Please select both a base photo and a hairstyle.',
       );
       return;
     }
-    setState(() {
-      loading = true;
-      saved = false; // reset on new generation
-    });
-    try {
-      final callable = FirebaseFunctions.instance.httpsCallable(
-        'virtualHairstyleTryOn',
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) {
+      _showAlert(
+        'Authentication Error',
+        'You must be logged in to try on hairstyles.',
       );
-      final result = await callable.call({
-        'imageBase64': imageBase64,
-        'hairstylePrompt': selectedStyle!.targetHairstyle,
-        'hairColor': selectedStyle!.hairColor,
-      });
+      return;
+    }
 
-      final falUrl = result.data['outputImageUrl'] as String;
+    setState(() => loading = true);
 
-      // Switch to transfer state
-      setState(() {
-        loading = false;
-        transferring = true;
-      });
+    try {
+      // 2. Resolve reference hairstyle base64 (custom upload vs. preset URL)
+      String? hairstyleBase64 = customHairBase64;
 
-      final permanentUrl = await _saveFalImageToStorage(falUrl);
-      setState(() => resultUrl = permanentUrl);
-      await _fetchUsage();
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        final ctx = _resultKey.currentContext;
-        if (ctx != null) {
-          Scrollable.ensureVisible(
-            ctx,
-            duration: const Duration(milliseconds: 600),
-            curve: Curves.easeOut,
-          );
+      if (!selectedStyle!.isCustom) {
+        try {
+          final response = await http.get(Uri.parse(selectedStyle!.imageUrl));
+          hairstyleBase64 = base64Encode(response.bodyBytes);
+        } catch (e) {
+          if (mounted) setState(() => loading = false);
+          _showAlert('Error', 'Could not process selected hairstyle image.');
+          return;
         }
+      }
+
+      if (hairstyleBase64 == null) {
+        if (mounted) setState(() => loading = false);
+        _showAlert('Error', 'Hairstyle image data is missing.');
+        return;
+      }
+
+      // 3. Call Cloud Function to submit job to fal.ai queue
+      final callable = FirebaseFunctions.instance.httpsCallable(
+        'virtualHairstyleFalSegmindTryOn',
+      );
+
+      final response = await callable.call({
+        'userImageBase64': imageBase64,
+        'hairstyleImageBase64': hairstyleBase64,
+        'styleName': selectedStyle!.name,
+        'category': selectedStyle!.category,
       });
+
+      final data = Map<String, dynamic>.from(response.data as Map);
+      final success = data['success'] == true;
+      final requestId = data['requestId'] as String?;
+
+      if (!success || requestId == null) {
+        throw Exception('Failed to queue try-on job. Please try again.');
+      }
+
+      if (data['remainingToday'] != null && mounted) {
+        final remainingToday = data['remainingToday'] as int;
+        setState(() {
+          remaining = remainingToday;
+          usedToday = dailyLimit - remainingToday;
+          limitReached = remainingToday <= 0;
+        });
+      }
+
+      setState(() => activeRequestId = requestId);
+
+      // 4. & 5. Listen for completion / failure
+      _listenForResult(uid, requestId);
     } catch (e) {
+      if (mounted) setState(() => loading = false);
       final message = e is FirebaseFunctionsException
           ? e.message ?? 'Try-on failed. Please try again.'
           : e.toString();
       _showAlert('Error', message);
-    } finally {
-      setState(() {
-        loading = false;
-        transferring = false;
-      });
-    }
-  }
-
-  // ── Save result ────────────────────────────────────────────────────────────
-  Future<void> _saveResult() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null || resultUrl == null || selectedStyle == null) return;
-    setState(() => saving = true);
-    try {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .collection('tryOnHistory')
-          .add({
-            'imageUrl': resultUrl,
-            'styleName': selectedStyle!.name,
-            'targetHairstyle': selectedStyle!.targetHairstyle,
-            'hairColor': selectedStyle!.hairColor,
-            'category': selectedStyle!.category,
-            'gender': selectedStyle!.gender,
-            'type': selectedStyle!.type,
-            'savedAt': FieldValue.serverTimestamp(),
-          });
-      _showAlert('Saved! ✅', 'Your look has been saved to your history.');
-    } catch (e) {
-      _showAlert('Error', 'Failed to save. Please try again.');
-    } finally {
-      setState(() => saving = false);
     }
   }
 
@@ -378,9 +512,9 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                     bottom: Radius.circular(20),
                   ),
                 ),
-                child:  Row(
+                child: Row(
                   children: [
-                     GestureDetector(
+                    GestureDetector(
                       onTap: () => Navigator.pop(context),
                       child: Container(
                         padding: const EdgeInsets.all(8.0),
@@ -390,14 +524,12 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                         ),
                         child: Icon(
                           Icons.arrow_back,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.primary,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ),
-                    SizedBox(width: 15,),
-                    Text(
+                    const SizedBox(width: 15),
+                    const Text(
                       'Virtual Try-On ✨',
                       style: TextStyle(
                         fontSize: 17,
@@ -683,11 +815,62 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
+  // ── Custom upload tile ─────────────────────────────────────────────────────
+  Widget _buildCustomUploadTile(ColorScheme colors, double tileSize) {
+    final isSelected = selectedStyle?.isCustom == true;
+    return GestureDetector(
+      onTap: _pickCustomHairstyleImage,
+      child: Container(
+        width: tileSize,
+        height: tileSize * 1.3,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          // Flutter has no built-in dashed border (RN uses borderStyle:
+          // 'dashed') — using a solid border here as the closest match;
+          // swap in a package like `dotted_border` for exact parity.
+          border: Border.all(
+            color: colors.primary,
+            width: isSelected ? 3 : 2,
+          ),
+          color: colors.primary.withOpacity(0.06),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: isSelected && selectedStyle?.imageUrl != null
+            ? Image.file(File(selectedStyle!.imageUrl), fit: BoxFit.cover)
+            : Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.add_circle_outline,
+                      size: 32,
+                      color: colors.primary,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Upload Custom Hairstyle',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: colors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+      ),
+    );
+  }
+
   // ── Style Grid ─────────────────────────────────────────────────────────────
   Widget _buildStyleGrid(ColorScheme colors) {
     return StreamBuilder<QuerySnapshot>(
       stream: _hairstyleStream,
       builder: (context, snap) {
+        final tileSize = (MediaQuery.of(context).size.width - 48) / 3;
+
         if (snap.connectionState == ConnectionState.waiting) {
           return Padding(
             padding: const EdgeInsets.symmetric(vertical: 40),
@@ -705,21 +888,10 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
             ),
           );
         }
-        if (!snap.hasData || snap.data!.docs.isEmpty) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 40),
-            child: Center(
-              child: Text(
-                'No styles available yet.',
-                style: TextStyle(color: Colors.grey[500]),
-              ),
-            ),
-          );
-        }
 
-        hairstyles = snap.data!.docs
-            .map((d) => HairstyleOption.fromFirestore(d))
-            .toList();
+        hairstyles = snap.hasData
+            ? snap.data!.docs.map((d) => HairstyleOption.fromFirestore(d)).toList()
+            : [];
 
         final filtered = activeCategory == 'All'
             ? hairstyles
@@ -730,115 +902,115 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           child: Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: filtered.map((style) {
-              final isSelected = selectedStyle?.id == style.id;
-              final tileSize = (MediaQuery.of(context).size.width - 48) / 3;
-              // Match the decoded bitmap size to the actual rendered
-              // tile size (scaled by device pixel ratio) instead of a
-              // fixed guess — keeps the fix correct across phone and
-              // tablet widths.
-              final cacheWidth =
-                  (tileSize * MediaQuery.of(context).devicePixelRatio)
-                      .round();
-              return GestureDetector(
-                onTap: () => setState(() {
-                  selectedStyle = style;
-                  resultUrl = null;
-                }),
-                child: SizedBox(
-                  width: tileSize,
-                  height: tileSize * 1.3,
-                  child: Stack(
-                    children: [
-                      // Image
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: CachedNetworkImage(
-                          imageUrl: style.imageUrl,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          memCacheWidth: cacheWidth,
-                          placeholder: (_, __) => Container(
-                            color: Colors.grey[200],
-                            child: const Center(
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
-                          ),
-                          errorWidget: (_, __, ___) => Container(
-                            color: Colors.grey[200],
-                            child: const Icon(
-                              Icons.broken_image,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Selection overlay
-                      if (isSelected)
+            children: [
+              _buildCustomUploadTile(colors, tileSize),
+              ...filtered.map((style) {
+                final isSelected = selectedStyle?.id == style.id;
+                final cacheWidth =
+                    (tileSize * MediaQuery.of(context).devicePixelRatio)
+                        .round();
+                return GestureDetector(
+                  onTap: () => setState(() {
+                    selectedStyle = style;
+                    customHairBase64 = null;
+                    resultUrl = null;
+                  }),
+                  child: SizedBox(
+                    width: tileSize,
+                    height: tileSize * 1.3,
+                    child: Stack(
+                      children: [
+                        // Image
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            color: colors.primary.withOpacity(0.35),
-                            alignment: Alignment.center,
-                            child: const Text(
-                              '✓',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 28,
-                                fontWeight: FontWeight.w700,
+                          child: CachedNetworkImage(
+                            imageUrl: style.imageUrl,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            memCacheWidth: cacheWidth,
+                            placeholder: (_, __) => Container(
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                            errorWidget: (_, __, ___) => Container(
+                              color: Colors.grey[200],
+                              child: const Icon(
+                                Icons.broken_image,
+                                color: Colors.grey,
                               ),
                             ),
                           ),
                         ),
 
-                      // Name label
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: ClipRRect(
-                          borderRadius: const BorderRadius.vertical(
-                            bottom: Radius.circular(12),
-                          ),
-                          child: Container(
-                            color: Colors.black.withOpacity(0.5),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 4,
-                            ),
-                            child: Text(
-                              style.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 11,
+                        // Selection overlay
+                        if (isSelected)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              color: colors.primary.withOpacity(0.35),
+                              alignment: Alignment.center,
+                              child: const Text(
+                                '✓',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                        ),
-                      ),
 
-                      // Selection border
-                      if (isSelected)
-                        Positioned.fill(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: colors.primary,
-                                width: 3,
+                        // Name label
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.vertical(
+                              bottom: Radius.circular(12),
+                            ),
+                            child: Container(
+                              color: Colors.black.withOpacity(0.5),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 4,
                               ),
-                              borderRadius: BorderRadius.circular(12),
+                              child: Text(
+                                style.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ),
                         ),
-                    ],
+
+                        // Selection border
+                        if (isSelected)
+                          Positioned.fill(
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: colors.primary,
+                                  width: 3,
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            }).toList(),
+                );
+              }),
+            ],
           ),
         );
       },
@@ -869,10 +1041,78 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
     );
   }
 
-  // ── Try On Button ──────────────────────────────────────────────────────────
+  // ── Try On Button / Processing card ────────────────────────────────────────
   Widget _buildTryOnButton(ColorScheme colors) {
+    if (loading || transferring) {
+      return Container(
+        margin: const EdgeInsets.only(top: 20),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colors.primary),
+        ),
+        child: Column(
+          children: [
+            CircularProgressIndicator(color: colors.primary),
+            const SizedBox(height: 12),
+            Text(
+              'Generating Your Hairstyle ✨',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.access_time,
+                    size: 18,
+                    color: Color(0xFFD97706),
+                  ),
+                  const SizedBox(width: 10),
+                   Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          color: Color(0xFF92400E),
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                        children: [
+                          TextSpan(text: 'AI processing takes approx. '),
+                          TextSpan(
+                            text: '5–10 minutes',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          TextSpan(
+                            text:
+                                '. You can safely leave or wait here—your look will auto-update when ready!',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final disabled =
-        imageBase64 == null || selectedStyle == null || loading || limitReached;
+        imageBase64 == null || selectedStyle == null || limitReached;
+
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: SizedBox(
@@ -887,37 +1127,14 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: loading || transferring
-              ? Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      loading ? 'Generating...' : 'Saving result...',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ],
-                )
-              : Text(
-                  limitReached ? '⛔ Limit Reached' : '✨ Try This Style',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                  ),
-                ),
+          child: Text(
+            limitReached ? '⛔ Limit Reached' : '✨ Try This Style',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              fontSize: 15,
+            ),
+          ),
         ),
       ),
     );
@@ -946,133 +1163,56 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
           ),
           const SizedBox(height: 12),
 
-          // After image
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'After',
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-              ),
-              const SizedBox(height: 6),
-              GestureDetector(
-                onTap: () => setState(() => fullScreenVisible = true),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 280,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        CachedNetworkImage(
-                          imageUrl: resultUrl!,
-                          fit: BoxFit.cover,
-                          memCacheHeight: 500,
-                          placeholder: (_, __) => Container(
-                            color: Colors.grey[200],
-                            child: const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          ),
-                          errorWidget: (_, __, ___) => Container(
-                            color: Colors.grey[200],
-                            child: const Icon(Icons.broken_image),
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          child: Container(
-                            color: Colors.black.withOpacity(0.4),
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            alignment: Alignment.center,
-                            child: const Text(
-                              'Tap to view full screen',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+          // Result image
+          GestureDetector(
+            onTap: () => setState(() => fullScreenVisible = true),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: double.infinity,
+                height: 280,
+                child: CachedNetworkImage(
+                  imageUrl: resultUrl!,
+                  fit: BoxFit.cover,
+                  memCacheHeight: 500,
+                  placeholder: (_, __) => Container(
+                    color: Colors.grey[200],
+                    child: const Center(child: CircularProgressIndicator()),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    color: Colors.grey[200],
+                    child: const Icon(Icons.broken_image),
                   ),
                 ),
               ),
-            ],
+            ),
           ),
 
           const SizedBox(height: 16),
 
-          // Action buttons
+          // Result is saved automatically server-side once generated — this
+          // is a static confirmation badge, not an interactive save action.
           Row(
             children: [
               Expanded(
-                child: OutlinedButton(
-                  onPressed: saving || saved ? null : _saveResult,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    side: BorderSide(
-                      color: saved ? const Color(0xFF22c55e) : colors.primary,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF22c55e)),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    '✅ Saved',
+                    style: TextStyle(
+                      color: Color(0xFF22c55e),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
                     ),
                   ),
-                  child: saving
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: colors.primary,
-                          ),
-                        )
-                      : Text(
-                          saved ? '✅ Saved' : '🔖 Save Look',
-                          style: TextStyle(
-                            color: saved
-                                ? const Color(0xFF22c55e)
-                                : colors.primary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 14,
-                          ),
-                        ),
                 ),
               ),
-              const SizedBox(width: 10),
             ],
-          ),
-
-          // Try another
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                resultUrl = null;
-                selectedStyle = null;
-              });
-              _scrollController.animateTo(
-                0,
-                duration: const Duration(milliseconds: 500),
-                curve: Curves.easeOut,
-              );
-            },
-            child: Container(
-              alignment: Alignment.center,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text(
-                'Try another style',
-                style: TextStyle(
-                  color: colors.primary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
           ),
         ],
       ),
@@ -1111,25 +1251,15 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          selectedStyle?.name ?? '',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          selectedStyle?.category ?? '',
-                          style: const TextStyle(
-                            color: Colors.white54,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                  const Expanded(
+                    child: Text(
+                      'New look',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   GestureDetector(
@@ -1175,50 +1305,6 @@ class _VirtualTryOnScreenState extends State<VirtualTryOnScreen> {
                 ),
                 errorWidget: (_, __, ___) =>
                     const Icon(Icons.broken_image, color: Colors.white),
-              ),
-            ),
-
-            // Footer
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: saving
-                          ? null
-                          : () {
-                              setState(() => fullScreenVisible = false);
-                              _saveResult();
-                            },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: BorderSide(color: Colors.white.withOpacity(0.3)),
-                      ),
-                      child: saving
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              '🔖 Save Look',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                ],
               ),
             ),
           ],

@@ -40,21 +40,20 @@ class _TryOnViewerScreenState extends State<TryOnViewerScreen> {
               ),
               child: Icon(
                 Icons.arrow_back,
-                color: Theme.of(
-                  context,
-                ).colorScheme.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),
         ),
         title: Text(
-          'My Looks',
+          'Try-On History',
           style: TextStyle(
             color: Colors.white,
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
-        ),),
+        ),
+      ),
       body: Stack(
         children: [
           Column(
@@ -182,7 +181,6 @@ class _TryOnViewerScreenState extends State<TryOnViewerScreen> {
             CachedNetworkImage(
               imageUrl: record.imageUrl,
               fit: BoxFit.cover,
-              memCacheHeight: 300,
               memCacheWidth: 300,
               placeholder: (_, __) => Container(
                 color: Colors.grey[200],
@@ -350,7 +348,7 @@ class _TryOnViewerScreenState extends State<TryOnViewerScreen> {
             ),
 
             // Footer — book button
-            Padding(
+            /*  Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               child: SizedBox(
                 width: double.infinity,
@@ -378,7 +376,7 @@ class _TryOnViewerScreenState extends State<TryOnViewerScreen> {
                   ),
                 ),
               ),
-            ),
+            ),*/
           ],
         ),
       ),

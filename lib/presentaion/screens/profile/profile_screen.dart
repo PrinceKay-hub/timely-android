@@ -9,8 +9,8 @@ import 'package:booking/presentaion/screens/profile/edit_profile.dart';
 import 'package:booking/presentaion/screens/profile/policy.dart';
 import 'package:booking/presentaion/screens/profile/terms.dart';
 import 'package:booking/presentaion/screens/profile/try_on_history.dart';
+import 'package:booking/presentaion/screens/shop/my_listings_screen.dart';
 import 'package:booking/presentaion/theme/cubit/theme_cubit.dart';
-import 'package:booking/presentaion/user/cubit/user_cubit.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -291,6 +291,33 @@ final isProvider = parseBool(widget.user['isProvider']);
                                 userId: widget.user['id'] ?? null,
                                 isProvider: isProvider,
                               ),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    _buildMenuItem(
+                      context,
+                      Icons.shopping_bag_outlined,
+                      'Manage Product Listing',
+                      () {
+                        if (!isEmailVerified) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: Colors.red,
+                              showCloseIcon: true,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadiusGeometry.circular(10),
+                              ),
+                              content: const Text('Email not verified'),
+                            ),
+                          );
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MyListingsScreen(),
                             ),
                           );
                         }

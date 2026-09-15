@@ -121,6 +121,7 @@ class _ChatRow extends StatelessWidget {
     final unread = chat.unreadCount[myUid] ?? 0;
     final isProvider = ChatCubit.isProviderInChat(chat, myUid);
     final title = isProvider ? otherName : (chat.serviceName ?? otherName);
+    final serviceProductName = chat.serviceName ?? '';
 
     // Subscribe to presence
     context.read<PresenceCubit>().subscribeToPresence(otherUid);
@@ -139,7 +140,14 @@ class _ChatRow extends StatelessWidget {
         fallbackColor: colorScheme.primary.withOpacity(0.2),
         fallbackTextColor: colorScheme.primary,
       ),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(otherName, style:  TextStyle(color: Theme.of(context).colorScheme.onSurface, fontSize: 12)),
+          Text(serviceProductName, style: const TextStyle(fontWeight: FontWeight.bold)),
+          
+        ],
+      ),
       subtitle: Row(
         children: [
           // Show status tick only if the last message is from the current user

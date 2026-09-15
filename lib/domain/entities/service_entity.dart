@@ -73,6 +73,7 @@ class ServiceEntity extends Equatable {
   final String region;
   final String district;
   final String landmark;
+  final String providerName;
 
   const ServiceEntity({
     required this.id,
@@ -97,7 +98,8 @@ class ServiceEntity extends Equatable {
     required this.number,
     required this.region,
     required this.district,
-    required this.landmark
+    required this.landmark,
+    required this.providerName,
   });
 
   ServiceEntity copyWith({
@@ -123,7 +125,8 @@ class ServiceEntity extends Equatable {
     String? number,
     String? region,
     String? district,
-    String? landmark
+    String? landmark,
+    String? providerName
   }) {
     return ServiceEntity(
       id: id ?? this.id,
@@ -149,6 +152,7 @@ class ServiceEntity extends Equatable {
       region: region ?? this.region,
       district: district ?? this.district,
       landmark: landmark ?? this.landmark,
+      providerName: providerName ?? this.providerName,
     );
   }
 
@@ -176,6 +180,7 @@ class ServiceEntity extends Equatable {
         number,
         region,
         district,
-        landmark
+        landmark,
+        providerName
       ];
 }

@@ -1,7 +1,7 @@
 
 import 'package:booking/domain/entities/user_entity.dart';
 import 'package:booking/presentaion/common/pages/loading_screen.dart';
-import 'package:booking/presentaion/screens/favorite/favorite_screen.dart';
+import 'package:booking/presentaion/screens/shop/shop_screen.dart';
 import 'package:booking/presentaion/screens/virtual/try_on.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -39,7 +39,7 @@ class _HomeEntryState extends State<HomeEntry> {
 
   static const _navItems = [
     _NavItemData(icon: FontAwesomeIcons.house, label: 'Home'),
-    _NavItemData(icon: FontAwesomeIcons.heart, label: 'Favorites'),
+    _NavItemData(icon: Icons.shopping_cart_outlined, label: 'Shop'),
     _NavItemData(icon: FontAwesomeIcons.wandMagicSparkles, label: 'Try on'),
     _NavItemData(icon: FontAwesomeIcons.calendar, label: 'Appointments'),
     _NavItemData(icon: FontAwesomeIcons.user, label: 'Profile'),
@@ -97,7 +97,7 @@ class _HomeEntryState extends State<HomeEntry> {
       case 0:
         return HomeScreen(user: user);
       case 1:
-        return FavoriteScreen(user: user);
+        return ShopScreen();
 
       case 2:
         return TryOnScreen();

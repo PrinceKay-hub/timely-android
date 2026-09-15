@@ -11,9 +11,10 @@ import '../../../data/models/chat_message.dart';
 import 'chat_state.dart';
 
 // Helper to generate deterministic chat ID
-String chatIdFor(String uidA, String uidB) {
+String chatIdFor(String uidA, String uidB, [String? serviceId]) {
   final List<String> sorted = [uidA, uidB]..sort();
-  return '${sorted[0]}_${sorted[1]}';
+  final pair = '${sorted[0]}_${sorted[1]}';
+  return serviceId != null && serviceId.isNotEmpty ? '${pair}_$serviceId' : pair;
 }
 
 // In-memory dedup cache for delivered marks
@@ -173,13 +174,13 @@ class ChatCubit extends Cubit<ChatState> {
     String? serviceName,
     String? providerId,
   }) async {
-    final chatId = chatIdFor(currentUserId, otherUserId);
+    final chatId = chatIdFor(currentUserId, otherUserId, serviceId);
     final docRef = _firestore.collection('chats').doc(chatId);
     final docSnap = await docRef.get();
 
     final resolvedProviderId = providerId ?? otherUserId;
     ChatSummary chatSummary;
-
+    
     if (!docSnap.exists) {
       final newChat = {
         'participants': [currentUserId, otherUserId]..sort(),
