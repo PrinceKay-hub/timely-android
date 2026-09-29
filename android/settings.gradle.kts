@@ -24,6 +24,7 @@ plugins {
     // END: FlutterFire Configuration
     id("org.jetbrains.kotlin.android") version "2.1.0" apply false
     id("org.gradle.toolchains.foojay-resolver-convention") version "0.10.0"
+    id("com.google.firebase.firebase-perf") version "2.0.2" apply false
 }
 
 include(":app")

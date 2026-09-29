@@ -82,6 +82,9 @@ functions.https.onRequest(async (req, res) => {
         payload: {
           aps: {
             "sound": "default",
+            ...(typeof req.body.badge === "number" && {
+              badge: req.body.badge,
+            }),
           },
         },
         headers: {
@@ -1054,8 +1057,8 @@ onSchedule({
     const message = {
       token: fcmToken,
       notification: {
-        title: "Weekend slots are filling up 💇",
-        body: "Your favorite provider's weekend slots are filling fast.",
+        title: "Weekend glow-up incoming! 💅",
+        body: "Tap now to book your go-to artist before everyone else does.",
       },
       data: {
         type: "weekly_promo",

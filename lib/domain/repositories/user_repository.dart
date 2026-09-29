@@ -15,5 +15,5 @@ abstract class UserRepository {
   Stream<UserEntity?> get currentUserStream;
 
   Stream<UserEntity> streamUser(String uid);
-
+  Future<void> saveLocation(double latitude, double longitude, String? address );
 }

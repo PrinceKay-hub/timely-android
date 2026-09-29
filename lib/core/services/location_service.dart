@@ -52,12 +52,8 @@ class LocationService {
     double endLat,
     double endLng,
   ) {
-    return Geolocator.distanceBetween(
-      startLat,
-      startLng,
-      endLat,
-      endLng,
-    ) / 1000; // Convert meters to kilometers
+    return Geolocator.distanceBetween(startLat, startLng, endLat, endLng) /
+        1000; // Convert meters to kilometers
   }
 
   // Format distance for display
@@ -69,26 +65,44 @@ class LocationService {
     }
   }
 
-  Future<String?> getAddressFromCoordinates(double latitude, double longitude) async {
+  Future<String?> getAddressFromCoordinates(
+    double latitude,
+    double longitude,
+  ) async {
     String address = '';
     try {
-        final placemarks = await placemarkFromCoordinates(
-          latitude,
-          longitude,
-        );
-        if (placemarks.isNotEmpty) {
-          final p = placemarks.first;
-          address = [
-            p.subAdministrativeArea,
-            p.locality,
-            p.administrativeArea,
-          ].where((e) => e != null && e.isNotEmpty).join(', ');
-        }
-
-      } catch (geoError) {
-        // Reverse geocoding failed, fall back to coordinates only
-        debugPrint('Reverse geocoding failed: $geoError');
+      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        address = [
+          p.subAdministrativeArea,
+          p.locality,
+          p.administrativeArea,
+        ].where((e) => e != null && e.isNotEmpty).join(', ');
       }
+    } catch (geoError) {
+      // Reverse geocoding failed, fall back to coordinates only
+      debugPrint('Reverse geocoding failed: $geoError');
+    }
     return address;
+  }
+
+  Future<String?> getAddressFromLatLng(double lat, double lng) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(lat, lng);
+      if (placemarks.isEmpty) return null;
+
+      final p = placemarks.first;
+      final parts = [
+        p.subLocality,
+        p.locality,
+        p.administrativeArea,
+        p.country,
+      ].where((e) => e != null && e.trim().isNotEmpty).toList();
+
+      return parts.join(', ');
+    } catch (_) {
+      return null;
+    }
   }
 }

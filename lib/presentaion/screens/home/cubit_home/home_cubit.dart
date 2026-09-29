@@ -1,6 +1,7 @@
 // lib/presentation/home/cubit/home_cubit.dart
 import 'package:bloc/bloc.dart';
 import 'package:booking/data/repositories/category_repository.dart';
+import 'package:booking/domain/repositories/user_repository.dart';
 import 'package:equatable/equatable.dart';
 import 'package:booking/core/services/location_service.dart';
 
@@ -11,10 +12,12 @@ enum ViewType { grid, list, tile }
 class HomeCubit extends Cubit<HomeState> {
   final CategoryRepository categoryRepository;
   final LocationService locationService;
+  final UserRepository userRepository;
 
   HomeCubit({
     required this.categoryRepository,
     required this.locationService,
+    required this.userRepository,
   }) : super(const HomeState());
 
   Future<void> loadCategories() async {
@@ -38,13 +41,24 @@ class HomeCubit extends Cubit<HomeState> {
   }
 
   Future<void> updateLocation() async {
-  try {
-    final position = await locationService.getCurrentLocation();
-    if (position != null) {
+    try {
+      final position = await locationService.getCurrentLocation();
+      if (position == null) return;
+
+      final address = await locationService.getAddressFromLatLng(
+        position.latitude,
+        position.longitude,
+      );
+
       setLocation('${position.latitude},${position.longitude}');
+
+      await userRepository.saveLocation(
+        position.latitude,
+        position.longitude,
+        address,
+      );
+    } catch (e) {
+      emit(state.copyWith(locationError: e.toString()));
     }
-  } catch (e) {
-    emit(state.copyWith(locationError: e.toString()));
   }
-}
 }

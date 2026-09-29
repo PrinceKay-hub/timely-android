@@ -218,6 +218,7 @@ class MyApp extends StatelessWidget {
             create: (context) => HomeCubit(
               categoryRepository: CategoryRepository(),
               locationService: LocationService(),
+              userRepository: context.read<UserRepositoryImpl>(),
             ),
           ),
           BlocProvider(create: (context) => ConnectivityCubit()),

@@ -1,6 +1,6 @@
 import 'dart:math';
 
-import 'package:booking/core/utils/geohash_util.dart';
+import 'package:booking/core/utils/geofire_util.dart';
 import 'package:booking/domain/entities/service_entity.dart';
 import 'package:booking/domain/repositories/service_repository.dart';
 import 'package:booking/data/models/service_model.dart';
@@ -272,34 +272,22 @@ Future<List<Map<String, dynamic>>> getNearbyServices({
   int limit = 15,
 }) async {
   try {
-    final precision = GeoHashUtil.precisionForRadiusKm(radiusKm);
-    final cellHashes = GeoHashUtil.neighborsAndSelf(
-      latitude,
-      longitude,
-      precision: precision,
+    final bounds = geohashQueryBounds(latitude, longitude, radiusKm * 1000);
+
+    final snapshots = await Future.wait(
+      bounds.map(
+        (b) => serviceCollection
+            .where('status', isEqualTo: 'approved')
+            .orderBy('geohash')
+            .startAt([b.$1])
+            .endAt([b.$2])
+            .get(),
+      ),
     );
- 
-    // One range query per cell. \uf8ff is a high-codepoint character
-    // used as the standard Firestore "prefix range" upper bound.
-    // Capped at 25/cell — generous enough to find real nearby matches
-    // per cell without over-fetching, since only `limit` (15) are
-    // ever shown.
-    final futures = cellHashes.map((prefix) {
-      return serviceCollection
-          .where('status', isEqualTo: 'approved')
-          .where('geohash', isGreaterThanOrEqualTo: prefix)
-          .where('geohash', isLessThanOrEqualTo: '$prefix\uf8ff')
-          .limit(25)
-          .get();
-    });
- 
-    final snapshots = await Future.wait(futures);
- 
-    // Merge + dedupe (a doc could theoretically show up if cell
-    // boundaries overlap due to clamping/wrapping).
+
     final seenIds = <String>{};
     final withDistance = <MapEntry<double, Map<String, dynamic>>>[];
- 
+
     for (final snap in snapshots) {
       for (final doc in snap.docs) {
         if (!seenIds.add(doc.id)) continue;
@@ -307,17 +295,16 @@ Future<List<Map<String, dynamic>>> getNearbyServices({
         final lat = (data['latitude'] as num?)?.toDouble();
         final lng = (data['longitude'] as num?)?.toDouble();
         if (lat == null || lng == null) continue;
- 
+
         final distanceKm = _haversineKm(latitude, longitude, lat, lng);
         if (distanceKm <= radiusKm) {
-          // Attach distance under a key that won't collide with your
-          // Firestore schema, so the UI can display it.
-          final withDistanceEntry = {...data, 'distanceKm': distanceKm};
-          withDistance.add(MapEntry(distanceKm, withDistanceEntry));
+          withDistance.add(
+            MapEntry(distanceKm, {...data, 'distanceKm': distanceKm}),
+          );
         }
       }
     }
- 
+
     withDistance.sort((a, b) => a.key.compareTo(b.key));
     return withDistance.take(limit).map((e) => e.value).toList();
   } catch (e) {
